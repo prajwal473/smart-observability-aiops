@@ -346,6 +346,7 @@ def test_sender_accepts_201_and_handles_409_conflict_idempotently(tmp_path: Path
 
 
 def test_generator_failed_logins_and_out_of_order_modes() -> None:
+    from datetime import datetime, timezone
     gen = TelemetryGenerator(seed=42, mode="failed_logins", source_timezone="Asia/Kolkata")
     burst_events = gen.generate_raw_batch(
         now_utc=datetime(2026, 11, 20, 10, 15, 0, tzinfo=timezone.utc),
