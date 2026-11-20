@@ -25,7 +25,7 @@ DEFAULT_SENSITIVE_KEYS = {
 DEFAULT_SECRET_PATTERNS = [
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-~+/=]+"),
-    re.compile(r"(?i)(?:password|passwd|pwd|secret|api_key|apikey|token)\s*[:=]\s*[^\s,;"']+"),
+    re.compile(r'(?i)(?:password|passwd|pwd|secret|api_key|apikey|token)\s*[:=]\s*[^\s,;"\']+'),
     re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"),
 ]
