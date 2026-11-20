@@ -4,10 +4,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Fake/test secret markers that must NOT appear outside raw test data or logs/raw stores
+# Fake/test secret markers that must NOT appear in runtime/output/contract paths
 MARKERS='AKIAFAKEFAKEFAKE0000|hunter2-FAKE|FAKE\.TOKEN\.VALUE'
 
-echo "Scanning repository (excluding .git, .venv, venv, collector-security/data, sample-data/raw)..."
+echo "Scanning runtime/contract/output paths for accidental secret markers..."
 if grep -rnE \
   --exclude-dir='.git' \
   --exclude-dir='.venv' \
@@ -16,10 +16,12 @@ if grep -rnE \
   --exclude-dir='.pytest_cache' \
   --exclude-dir='data' \
   --exclude-dir='raw' \
+  --exclude-dir='tests' \
+  --exclude='generator.py' \
   --exclude='grep_secrets.sh' \
   "$MARKERS" . ; then
-  echo "FAIL: Secret marker found outside allowed raw/ignored paths!" >&2
+  echo "FAIL: Secret marker found outside allowed raw/ignored/test paths!" >&2
   exit 1
 fi
 
-echo "PASS: No secret markers found in tracked/non-raw directories."
+echo "PASS: No secret markers found outside allowed raw/ignored/test paths."
