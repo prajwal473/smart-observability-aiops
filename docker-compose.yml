@@ -1,0 +1,132 @@
+# =============================================================================
+# docker-compose.yml — Smart Observability and AIOps Platform (CICADA 2026)
+#
+# Services
+#   postgres   centralized SaaS database
+#   backend    FastAPI (includes the aiops-engine package, imported as a library)
+#   frontend   React/Vite dashboard
+#   collector  local collector + telemetry generator (profile: collector)
+#
+# Usage
+#   cp .env.example .env
+#   docker compose up -d --build                       # SaaS tier: postgres, backend, frontend
+#   docker compose --profile collector up -d collector # also start a collector
+#
+# Status note: this file has NOT been run yet. It expects these files to exist
+# (created in the implementation batches):
+#   backend-database/Dockerfile
+#   frontend-dashboard/Dockerfile
+#   collector-security/Dockerfile
+# The aiops-engine is built into the backend image (see build context below).
+# =============================================================================
+
+name: smart-observability
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Tier 2 — SaaS platform
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: obs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-observability}
+      POSTGRES_USER: ${POSTGRES_USER:-obs_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"        # remove this mapping outside local development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-obs_user} -d ${POSTGRES_DB:-observability}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - saas-net
+
+  backend:
+    build:
+      context: .                              # repo root, so the image can include aiops-engine/ and shared/
+      dockerfile: backend-database/Dockerfile
+    container_name: obs-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-obs_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-observability}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs/backend:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - saas-net
+      - collector-net      # reachable by collectors
+
+  frontend:
+    build:
+      context: ./frontend-dashboard
+      dockerfile: Dockerfile
+    container_name: obs-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws}
+      VITE_USE_MOCK: ${VITE_USE_MOCK:-false}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    networks:
+      - saas-net
+
+  # ---------------------------------------------------------------------------
+  # Tier 1 — Local customer environment
+  # Raw data, SQLite buffer and egress audit stay in the local volume.
+  # Started only when requested: docker compose --profile collector up -d
+  # ---------------------------------------------------------------------------
+  collector:
+    profiles: ["collector"]
+    build:
+      context: .                                # repo root, so the image can include shared/ allow-list and rules
+      dockerfile: collector-security/Dockerfile
+    container_name: obs-collector
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: UTC
+      SAAS_BASE_URL: http://backend:8000
+      COLLECTOR_DATA_DIR: /data
+      COLLECTOR_SQLITE_PATH: /data/collector.db
+    depends_on:
+      - backend
+    volumes:
+      - collector-data:/data                    # local-only: buffer, audit, raw logs
+      - ./logs/collector:/app/logs
+    networks:
+      - collector-net
+
+networks:
+  saas-net:
+    driver: bridge
+  collector-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  collector-data:

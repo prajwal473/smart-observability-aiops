@@ -1,8 +1,31 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
-.venv/
+.pytest_cache/
+
+# Virtual environments
 venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Collector local runtime & logs
 collector-security/data/
 logs/
-.env
+*.log
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Separate nested repository
+smart-observability-aiops/
