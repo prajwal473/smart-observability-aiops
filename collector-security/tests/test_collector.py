@@ -205,3 +205,59 @@ def test_generator_determinism() -> None:
     b2 = g2.generate_raw_batch(now_utc=__import__("datetime").datetime(2026, 11, 20, 10, 0, 0, tzinfo=__import__("datetime").timezone.utc))
     assert b1[0]["cpu_pct"] == b2[0]["cpu_pct"]
     assert b1[0]["cpu_pct"] >= 92.0
+
+
+def test_auth_pause_and_422_non_blocking_queue(tmp_path: Path) -> None:
+    db_path = tmp_path / "edge.db"
+    store = CollectorStore(db_path)
+    cfg = CollectorConfig(
+        sqlite_path=db_path,
+        log_file_path=tmp_path / "collector.log",
+        saas_base_url="http://mock-saas:8000",
+    )
+
+    base_env = {
+        "tenant_id": "tnt_acme_001",
+        "collector_id": "col_acme_blr_01",
+        "source_id": "src_9999999999",
+        "event_type": "infrastructure_metrics",
+        "event_time_utc": "2026-11-20T10:15:03Z",
+        "source_timezone": "Asia/Kolkata",
+        "received_at_utc": "2026-11-20T10:15:03Z",
+        "data": {
+            "cpu_pct": 50.0,
+            "memory_pct": 55.0,
+            "disk_pct": 60.0,
+            "service_available": True,
+            "service_name": "worker",
+        },
+    }
+    e1 = dict(base_env, payload_id="22222222-2222-4222-8222-222222222221")
+    e2 = dict(base_env, payload_id="22222222-2222-4222-8222-222222222222")
+    store.enqueue_payload(e1, fields_redacted=[])
+    store.enqueue_payload(e2, fields_redacted=[])
+
+    # First item gets 422 (permanently rejected), second item gets 200 (delivered)
+    sess1 = _DummySession([_DummyResponse(422, "schema error"), _DummyResponse(200, '{"status":"ok"}')])
+    sender1 = CollectorSender(cfg, store, session=sess1, rng=random.Random(42))
+    res1 = sender1.send_batch_once(batch_size=2)
+    assert res1["rejected"] == 1
+    assert res1["sent"] == 1
+    stats1 = store.get_queue_stats()
+    assert stats1["rejected"] == 1
+    assert stats1["delivered"] == 1
+
+    # Enqueue a third item and simulate 401 auth failure -> pauses sending, keeps pending
+    e3 = dict(base_env, payload_id="22222222-2222-4222-8222-222222222223")
+    store.enqueue_payload(e3, fields_redacted=[])
+    sess2 = _DummySession([_DummyResponse(401, "unauthorized")])
+    sender2 = CollectorSender(cfg, store, session=sess2, rng=random.Random(42))
+    res2 = sender2.send_batch_once(batch_size=1)
+    assert res2["paused_auth"] is True
+    assert store.get_queue_stats()["pending"] == 1
+
+    # Subsequent call while auth_paused is True does not hit network
+    res3 = sender2.send_batch_once(batch_size=1)
+    assert res3["paused_auth"] is True
+    assert len(sess2.calls) == 1
+    store.close()
