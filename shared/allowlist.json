@@ -1,0 +1,58 @@
+{
+  "contract_version": "1.0",
+  "envelope_fields": [
+    "payload_id",
+    "tenant_id",
+    "collector_id",
+    "source_id",
+    "event_type",
+    "event_time_utc",
+    "source_timezone",
+    "data"
+  ],
+  "event_types": {
+    "infrastructure": {
+      "allowed_data_fields": [
+        "cpu_pct",
+        "memory_pct",
+        "disk_pct",
+        "service_available",
+        "service_name"
+      ],
+      "free_text_fields": [
+        "service_name"
+      ]
+    },
+    "network": {
+      "allowed_data_fields": [
+        "bandwidth_mbps",
+        "latency_ms",
+        "packet_loss_pct",
+        "connectivity_status"
+      ],
+      "free_text_fields": []
+    },
+    "security": {
+      "allowed_data_fields": [
+        "event_category",
+        "severity",
+        "count",
+        "window_seconds",
+        "context"
+      ],
+      "free_text_fields": [
+        "context"
+      ]
+    },
+    "heartbeat": {
+      "allowed_data_fields": [
+        "collector_version",
+        "resource_cpu_pct",
+        "resource_memory_mb",
+        "config_status",
+        "last_successful_send_utc"
+      ],
+      "free_text_fields": []
+    }
+  }
+}

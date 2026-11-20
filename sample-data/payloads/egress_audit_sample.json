@@ -1,0 +1,80 @@
+[
+  {
+    "audit_id": "egress_eb6b4764",
+    "payload_id": "0974e23e-e776-4fe2-be8d-289a96d1a67d",
+    "fields_sent": [
+      "collector_id",
+      "data.cpu_pct",
+      "data.disk_pct",
+      "data.memory_pct",
+      "data.service_available",
+      "data.service_name",
+      "event_time_utc",
+      "event_type",
+      "payload_id",
+      "received_at_utc",
+      "source_id",
+      "source_timezone",
+      "tenant_id"
+    ],
+    "fields_redacted": [],
+    "content_hash": "sha256:e80379c3aae6e5b76dddeeec9bcedb32d8e6b4fdcf18ef05f78a010a2790de25",
+    "queued_at_utc": "2026-11-20T12:30:02Z",
+    "sent_at_utc": null,
+    "payload": {
+      "collector_id": "col_acme_blr_01",
+      "data": {
+        "cpu_pct": 39.6,
+        "disk_pct": 65.7,
+        "memory_pct": 55.2,
+        "service_available": true,
+        "service_name": "db-primary"
+      },
+      "event_time_utc": "2026-11-20T10:15:00Z",
+      "event_type": "infrastructure_metrics",
+      "payload_id": "0974e23e-e776-4fe2-be8d-289a96d1a67d",
+      "received_at_utc": "2026-11-20T12:30:02Z",
+      "source_id": "src_bfcaf07b1a",
+      "source_timezone": "Asia/Kolkata",
+      "tenant_id": "tnt_acme_001"
+    }
+  },
+  {
+    "audit_id": "egress_1cbf481d",
+    "payload_id": "ce8ae2c7-683d-46a4-a429-70d2f98ed85c",
+    "fields_sent": [
+      "collector_id",
+      "data.bandwidth_mbps",
+      "data.connectivity_status",
+      "data.latency_ms",
+      "data.packet_loss_pct",
+      "event_time_utc",
+      "event_type",
+      "payload_id",
+      "received_at_utc",
+      "source_id",
+      "source_timezone",
+      "tenant_id"
+    ],
+    "fields_redacted": [],
+    "content_hash": "sha256:4707f7da2a352802934b9f2285d1eda2d074c960923ab080ccbadd35a05099ab",
+    "queued_at_utc": "2026-11-20T12:30:02Z",
+    "sent_at_utc": null,
+    "payload": {
+      "collector_id": "col_acme_blr_01",
+      "data": {
+        "bandwidth_mbps": 753.5,
+        "connectivity_status": "up",
+        "latency_ms": 24.9,
+        "packet_loss_pct": 0.19
+      },
+      "event_time_utc": "2026-11-20T10:15:00Z",
+      "event_type": "network_metrics",
+      "payload_id": "ce8ae2c7-683d-46a4-a429-70d2f98ed85c",
+      "received_at_utc": "2026-11-20T12:30:02Z",
+      "source_id": "src_bfcaf07b1a",
+      "source_timezone": "Asia/Kolkata",
+      "tenant_id": "tnt_acme_001"
+    }
+  }
+]

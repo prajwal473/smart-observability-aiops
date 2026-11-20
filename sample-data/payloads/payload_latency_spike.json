@@ -1,0 +1,35 @@
+[
+  {
+    "payload_id": "ef496e03-6729-4d97-a43b-2dc617bf11ed",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "infrastructure_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:19Z",
+    "data": {
+      "cpu_pct": 39.6,
+      "memory_pct": 55.2,
+      "disk_pct": 65.7,
+      "service_available": true,
+      "service_name": "db-primary"
+    }
+  },
+  {
+    "payload_id": "e7ad2cab-4e16-4a34-ad98-533e757272ce",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "network_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:19Z",
+    "data": {
+      "bandwidth_mbps": 305.2,
+      "latency_ms": 244.1,
+      "packet_loss_pct": 0.19,
+      "connectivity_status": "up"
+    }
+  }
+]

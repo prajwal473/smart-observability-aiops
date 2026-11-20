@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .pytest_cache/
 
 # Virtual environments
@@ -10,19 +11,21 @@ venv/
 # Environment variables
 .env
 .env.*
-
-# Keep example environment file
 !.env.example
 
 # IDE
 .vscode/
 .idea/
 
-# Logs
+# Collector local runtime & logs
+collector-security/data/
+logs/
 *.log
+
 # Local databases
 *.db
 *.sqlite
 *.sqlite3
+
 # Separate nested repository
 smart-observability-aiops/

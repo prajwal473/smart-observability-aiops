@@ -1,0 +1,53 @@
+{
+  "version": "1.0",
+  "replacement_marker": "[REDACTED]",
+  "secret_patterns": [
+    {
+      "name": "aws_access_key",
+      "pattern": "\\bAKIA[0-9A-Z]{16}\\b",
+      "replacement": "[REDACTED]"
+    },
+    {
+      "name": "bearer_token",
+      "pattern": "(?i)\\bBearer\\s+[A-Za-z0-9._\\-~+/=]+",
+      "replacement": "Bearer [REDACTED]"
+    },
+    {
+      "name": "password_assignment",
+      "pattern": "(?i)(?:password|passwd|pwd|secret|api_key|apikey|token)\\s*[:=]\\s*[^\\s,;\"']+",
+      "replacement": "[REDACTED]"
+    },
+    {
+      "name": "private_key_block",
+      "pattern": "-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+      "replacement": "[REDACTED]"
+    },
+    {
+      "name": "credit_card_like",
+      "pattern": "\\b(?:\\d[ -]*?){13,16}\\b",
+      "replacement": "[REDACTED]"
+    },
+    {
+      "name": "email_address",
+      "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+      "replacement": "[REDACTED]"
+    },
+    {
+      "name": "ipv4_address",
+      "pattern": "\\b(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\b",
+      "replacement": "[REDACTED]"
+    }
+  ],
+  "sensitive_log_keys": [
+    "password",
+    "secret",
+    "token",
+    "authorization",
+    "api_key",
+    "cookie",
+    "private_key",
+    "raw_hostname",
+    "raw_user",
+    "raw_ip"
+  ]
+}
