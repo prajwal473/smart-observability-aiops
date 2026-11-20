@@ -1,0 +1,35 @@
+[
+  {
+    "payload_id": "376d2b4b-0fe9-4ae5-b421-f1ea8756e3e1",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "infrastructure_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:19Z",
+    "data": {
+      "cpu_pct": 39.6,
+      "memory_pct": 55.2,
+      "disk_pct": 65.7,
+      "service_available": true,
+      "service_name": "db-primary"
+    }
+  },
+  {
+    "payload_id": "a6cbea7f-f518-44c0-ac46-a24e2501e695",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "network_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:19Z",
+    "data": {
+      "bandwidth_mbps": 753.5,
+      "latency_ms": 24.9,
+      "packet_loss_pct": 10.12,
+      "connectivity_status": "degraded"
+    }
+  }
+]

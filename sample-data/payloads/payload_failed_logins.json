@@ -1,0 +1,103 @@
+[
+  {
+    "payload_id": "6b54ca1f-0d60-440c-ac8a-0a198f0232ac",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "infrastructure_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:19Z",
+    "data": {
+      "cpu_pct": 39.6,
+      "memory_pct": 55.2,
+      "disk_pct": 65.7,
+      "service_available": true,
+      "service_name": "db-primary"
+    }
+  },
+  {
+    "payload_id": "c7d09083-186d-423c-a82f-ab0675c0f169",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "network_metrics",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:20Z",
+    "data": {
+      "bandwidth_mbps": 753.5,
+      "latency_ms": 24.9,
+      "packet_loss_pct": 0.19,
+      "connectivity_status": "up"
+    }
+  },
+  {
+    "payload_id": "0d6ba5dc-6227-4e34-aa26-829bbd21262d",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "security_events",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:20Z",
+    "data": {
+      "event_category": "auth_failure_burst",
+      "severity": "high",
+      "count": 3,
+      "window_seconds": 60,
+      "context": "Repeated auth failures (3) within 60s window: invalid_password"
+    }
+  },
+  {
+    "payload_id": "ca224420-a11b-4376-ad23-66e8ab3145ca",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "security_events",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:20Z",
+    "data": {
+      "event_category": "auth_failure_burst",
+      "severity": "high",
+      "count": 4,
+      "window_seconds": 60,
+      "context": "Repeated auth failures (4) within 60s window: invalid_password"
+    }
+  },
+  {
+    "payload_id": "3dc96e0b-1151-49b0-9b95-0d86183a0c55",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "security_events",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:20Z",
+    "data": {
+      "event_category": "auth_failure_burst",
+      "severity": "high",
+      "count": 5,
+      "window_seconds": 60,
+      "context": "Repeated auth failures (5) within 60s window: invalid_password"
+    }
+  },
+  {
+    "payload_id": "335ca5cc-b550-414b-afe2-231e853b39b0",
+    "tenant_id": "tnt_acme_001",
+    "collector_id": "col_acme_blr_01",
+    "source_id": "src_bfcaf07b1a",
+    "event_type": "security_events",
+    "event_time_utc": "2026-11-20T10:15:00Z",
+    "source_timezone": "Asia/Kolkata",
+    "received_at_utc": "2026-11-20T11:17:20Z",
+    "data": {
+      "event_category": "auth_failure_burst",
+      "severity": "critical",
+      "count": 6,
+      "window_seconds": 60,
+      "context": "Repeated auth failures (6) within 60s window: invalid_password"
+    }
+  }
+]
