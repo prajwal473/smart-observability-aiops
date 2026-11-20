@@ -171,3 +171,9 @@ Items to state openly:
 | No secrets in repo, logs or slides | Section 4 | | | |
 | Clean-clone start verified | `docker compose up` | | | |
 | Demo rehearsed twice | | | | |
+
+### Live Integration & Replay Verification (`2026-11-20`)
+- **Collector / Tenant:** `collector-001` / `tenant-001` against `http://127.0.0.1:8000` (`collector-security/data/collector.db`)
+- **Root Causes Resolved During Integration:** Applied Alembic migrations (`3cb1044b5f69`), seeded `tenant-001` and `collector-001`, aligned `COLLECTOR_TOKEN` between `.env` and `uvicorn`, and normalized legacy `tnt_acme_001` / `col_acme_blr_01` + top-level `received_at_utc` fields on queued payloads.
+- **Replay Window (`18:03:28.550Z` – `18:03:28.634Z`):** `replayed_count: 5`, `sent: 5`, `failed: 0`, `rejected: 0`, `paused_auth: false` (`status_code: 201`), moving `pending` from `578` to `573` and `delivered` from `524` to `529`.
+- **Final Drained Queue State:** `pending: 0`, `in_flight: 0`, `delivered: 1222`, `rejected: 0` (`raw_events_local_count: 1223`, `egress_audit_count: 1222`).
