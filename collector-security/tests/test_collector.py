@@ -306,3 +306,56 @@ def test_replay_preserves_payload_id_and_hash(tmp_path: Path) -> None:
     assert due[0]["content_hash"] == enq["content_hash"]
     assert due[0]["attempts"] == 2
     store.close()
+
+
+def test_sender_accepts_201_and_handles_409_conflict_idempotently(tmp_path: Path) -> None:
+    db_path = tmp_path / "status_codes.db"
+    store = CollectorStore(db_path)
+    cfg = CollectorConfig(
+        sqlite_path=db_path,
+        log_file_path=tmp_path / "collector.log",
+        saas_base_url="http://127.0.0.1:8000",
+    )
+
+    env1 = {
+        "payload_id": "44444444-4444-4444-8444-444444444441",
+        "tenant_id": "tnt_acme_001",
+        "collector_id": "col_acme_blr_01",
+        "source_id": "src_4444444444",
+        "event_type": "infrastructure_metrics",
+        "event_time_utc": "2026-11-20T10:15:03Z",
+        "source_timezone": "Asia/Kolkata",
+        "received_at_utc": "2026-11-20T10:15:03Z",
+        "data": {
+            "cpu_pct": 50.0,
+            "memory_pct": 60.0,
+            "disk_pct": 40.0,
+            "service_available": True,
+            "service_name": "api-gw",
+        },
+    }
+    store.enqueue_payload(env1, fields_redacted=[])
+
+    sess = _DummySession([_DummyResponse(201, '{"status":"created"}')])
+    sender = CollectorSender(cfg, store, session=sess, rng=random.Random(42))
+    res = sender.send_batch_once(batch_size=1)
+    assert res["sent"] == 1
+    assert res["failed"] == 0
+    assert store.get_queue_stats()["delivered"] == 1
+    store.close()
+
+
+def test_generator_failed_logins_and_out_of_order_modes() -> None:
+    gen = TelemetryGenerator(seed=42, mode="failed_logins", source_timezone="Asia/Kolkata")
+    burst_events = gen.generate_raw_batch(
+        now_utc=datetime(2026, 11, 20, 10, 15, 0, tzinfo=timezone.utc),
+        mode="failed_logins",
+    )
+    assert len(burst_events) >= 1
+
+    ooo_events = gen.generate_raw_batch(
+        now_utc=datetime(2026, 11, 20, 10, 15, 0, tzinfo=timezone.utc),
+        mode="out_of_order",
+    )
+    assert len(ooo_events) >= 1
+    assert all("event_time_utc" in ev and "received_at_utc" in ev for ev in ooo_events)
