@@ -261,3 +261,48 @@ def test_auth_pause_and_422_non_blocking_queue(tmp_path: Path) -> None:
     assert res3["paused_auth"] is True
     assert len(sess2.calls) == 1
     store.close()
+
+
+def test_replay_preserves_payload_id_and_hash(tmp_path: Path) -> None:
+    db_path = tmp_path / "replay.db"
+    store = CollectorStore(db_path)
+    cfg = CollectorConfig(
+        sqlite_path=db_path,
+        log_file_path=tmp_path / "collector.log",
+        saas_base_url="http://mock-saas:8000",
+    )
+
+    env = {
+        "payload_id": "33333333-3333-4333-8333-333333333331",
+        "tenant_id": "tnt_acme_001",
+        "collector_id": "col_acme_blr_01",
+        "source_id": "src_3333333333",
+        "event_type": "infrastructure_metrics",
+        "event_time_utc": "2026-11-20T10:15:03Z",
+        "source_timezone": "Asia/Kolkata",
+        "received_at_utc": "2026-11-20T10:15:03Z",
+        "data": {
+            "cpu_pct": 65.0,
+            "memory_pct": 70.0,
+            "disk_pct": 55.0,
+            "service_available": True,
+            "service_name": "billing-api",
+        },
+    }
+    enq = store.enqueue_payload(env, fields_redacted=[])
+    sess = _DummySession([_DummyResponse(200, '{"status":"ok"}'), _DummyResponse(200, '{"status":"ok"}')])
+    sender = CollectorSender(cfg, store, session=sess, rng=random.Random(42))
+
+    first = sender.send_batch_once(batch_size=1)
+    assert first["sent"] == 1
+    assert store.get_queue_stats()["delivered"] == 1
+
+    store.reschedule_retry(env["payload_id"], delay_seconds=0.0, error_msg="replay")
+    assert store.get_queue_stats()["pending"] == 1
+
+    due = store.fetch_due_batch(batch_size=1)
+    assert len(due) == 1
+    assert due[0]["payload_id"] == env["payload_id"]
+    assert due[0]["content_hash"] == enq["content_hash"]
+    assert due[0]["attempts"] == 2
+    store.close()
