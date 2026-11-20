@@ -43,7 +43,7 @@ def test_allowlist_default_deny_and_strict_reject() -> None:
         "tenant_id": "tnt_acme_001",
         "collector_id": "col_acme_blr_01",
         "source_id": "src_abcdef1234",
-        "event_type": "infrastructure_metrics",
+        "event_type": "infrastructure",
         "event_time_utc": "2026-11-20T10:15:03Z",
         "source_timezone": "Asia/Kolkata",
         "received_at_utc": "2026-11-20T10:15:03Z",
@@ -64,7 +64,7 @@ def test_allowlist_default_deny_and_strict_reject() -> None:
     assert "password" not in filtered["data"]
     assert "raw_ip" not in filtered["data"]
     assert filtered["data"]["cpu_pct"] == 44.2
-    assert set(dropped) == {"raw_hostname", "data.password", "data.raw_ip"}
+    assert set(dropped) == {"received_at_utc", "raw_hostname", "data.password", "data.raw_ip"}
 
     with pytest.raises(ValueError):
         validator.validate_and_filter(env, strict_reject=True)
@@ -125,7 +125,7 @@ def test_auth_failure_burst_summarization_and_local_raw_store(tmp_path: Path) ->
             assert "198.51.100.10" not in json.dumps(res["envelope"])
             assert "hunter2-FAKE" not in json.dumps(res["envelope"])
 
-    assert emitted_types == ["security_events", "security_events"]
+    assert emitted_types == ["security", "security"]
     raw_rows = store.conn.execute("SELECT COUNT(*) AS c FROM raw_events;").fetchone()["c"]
     assert raw_rows == 4
     store.close()
@@ -220,7 +220,7 @@ def test_auth_pause_and_422_non_blocking_queue(tmp_path: Path) -> None:
         "tenant_id": "tnt_acme_001",
         "collector_id": "col_acme_blr_01",
         "source_id": "src_9999999999",
-        "event_type": "infrastructure_metrics",
+        "event_type": "infrastructure",
         "event_time_utc": "2026-11-20T10:15:03Z",
         "source_timezone": "Asia/Kolkata",
         "received_at_utc": "2026-11-20T10:15:03Z",
@@ -277,7 +277,7 @@ def test_replay_preserves_payload_id_and_hash(tmp_path: Path) -> None:
         "tenant_id": "tnt_acme_001",
         "collector_id": "col_acme_blr_01",
         "source_id": "src_3333333333",
-        "event_type": "infrastructure_metrics",
+        "event_type": "infrastructure",
         "event_time_utc": "2026-11-20T10:15:03Z",
         "source_timezone": "Asia/Kolkata",
         "received_at_utc": "2026-11-20T10:15:03Z",
@@ -322,7 +322,7 @@ def test_sender_accepts_201_and_handles_409_conflict_idempotently(tmp_path: Path
         "tenant_id": "tnt_acme_001",
         "collector_id": "col_acme_blr_01",
         "source_id": "src_4444444444",
-        "event_type": "infrastructure_metrics",
+        "event_type": "infrastructure",
         "event_time_utc": "2026-11-20T10:15:03Z",
         "source_timezone": "Asia/Kolkata",
         "received_at_utc": "2026-11-20T10:15:03Z",

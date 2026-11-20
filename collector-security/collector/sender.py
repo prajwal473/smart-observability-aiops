@@ -115,6 +115,23 @@ class CollectorSender:
                             "details": {"status_code": code, "attempt": item["attempts"]},
                         },
                     )
+                elif code == 409:
+                    now_ts = utc_now_iso()
+                    self.store.mark_delivered(pid, delivered_at_utc=now_ts)
+                    self.last_successful_send_utc = now_ts
+                    self.consecutive_failures = 0
+                    sent_count += 1
+                    self.logger.info(
+                        "Duplicate payload already accepted by SaaS (idempotent)",
+                        extra={
+                            "category": "transmission",
+                            "event": "transmit.duplicate_idempotent",
+                            "tenant_id": self.config.tenant_id,
+                            "collector_id": self.config.collector_id,
+                            "payload_id": pid,
+                            "details": {"status_code": code, "attempt": item["attempts"]},
+                        },
+                    )
                 elif code in (401, 403):
                     self.auth_paused = True
                     self.consecutive_failures += 1

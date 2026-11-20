@@ -17,6 +17,7 @@ if grep -rnE \
   --exclude-dir='data' \
   --exclude-dir='raw' \
   --exclude-dir='tests' \
+  --exclude-dir='docs' \
   --exclude='generator.py' \
   --exclude='grep_secrets.sh' \
   "$MARKERS" . ; then

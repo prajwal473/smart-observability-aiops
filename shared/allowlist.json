@@ -8,11 +8,10 @@
     "event_type",
     "event_time_utc",
     "source_timezone",
-    "received_at_utc",
     "data"
   ],
   "event_types": {
-    "infrastructure_metrics": {
+    "infrastructure": {
       "allowed_data_fields": [
         "cpu_pct",
         "memory_pct",
@@ -24,7 +23,7 @@
         "service_name"
       ]
     },
-    "network_metrics": {
+    "network": {
       "allowed_data_fields": [
         "bandwidth_mbps",
         "latency_ms",
@@ -33,7 +32,7 @@
       ],
       "free_text_fields": []
     },
-    "security_events": {
+    "security": {
       "allowed_data_fields": [
         "event_category",
         "severity",
@@ -45,7 +44,7 @@
         "context"
       ]
     },
-    "collector_heartbeat": {
+    "heartbeat": {
       "allowed_data_fields": [
         "collector_version",
         "resource_cpu_pct",
