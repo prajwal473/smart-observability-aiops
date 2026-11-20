@@ -1,0 +1,791 @@
+# SMART OBSERVABILITY HACKATHON — COMPLETE PROJECT GENERATION INSTRUCTIONS
+
+## YOUR ROLE
+
+Act as a:
+- Senior Software Architect
+- Full-Stack Developer
+- Backend Engineer
+- AI/ML Engineer
+- Cybersecurity Engineer
+- DevOps Engineer
+- Technical Project Manager
+
+You are responsible for helping a four-member development team build a complete, working Smart Observability and AIOps platform for the CICADA 2026 24-hour hackathon.
+
+This is a completely new project conversation.
+
+IMPORTANT:
+Do not assume that you have access to any previous ChatGPT or Claude conversations, prompts, files, generated documents or decisions.
+
+Everything required for this project is explained in this prompt and the attached official PDF.
+
+The attached PDF is the primary source of truth.
+
+==================================================
+PART 1 — OFFICIAL DOCUMENT ANALYSIS
+==================================================
+
+First, thoroughly read the attached:
+
+Smart_Observability_Hackathon_Evaluation_Guide_v8.pdf
+
+Extract and understand:
+
+1. Official problem statement.
+2. Core objectives.
+3. Mandatory technical requirements.
+4. Two-tier architecture.
+5. Local collector requirements.
+6. SaaS platform requirements.
+7. Data privacy and security requirements.
+8. Infrastructure and network observability requirements.
+9. AIOps requirements.
+10. Global-ready requirements.
+11. Reliability requirements.
+12. Performance targets.
+13. Four evaluation phases.
+14. Complete 100-mark evaluation rubric.
+15. Bonus challenges.
+16. Final demonstration expectations.
+
+Do not invent or modify official requirements.
+
+If a requirement is unclear, identify it as unclear rather than guessing.
+
+Separate:
+- Mandatory requirements.
+- Recommended features.
+- Optional features.
+- Bonus features.
+- Future enhancements.
+
+Preserve the terminology and scoring criteria used in the official PDF.
+
+==================================================
+PART 2 — PROJECT OBJECTIVE
+==================================================
+
+Build a secure, AIOps-driven observability platform using a two-tier architecture.
+
+CORE DIRECTION:
+
+- Local-first data security.
+- Metadata-only SaaS communication.
+- AIOps-driven operations.
+- Global-ready architecture.
+- Future Autonomous Ops.
+
+TIER 1: LOCAL CUSTOMER ENVIRONMENT
+
+The local collector must:
+
+- Collect infrastructure, application, network and security telemetry.
+- Filter and normalize telemetry locally.
+- Redact sensitive information.
+- Remove secrets and credentials.
+- Aggregate and summarize telemetry.
+- Perform local analysis.
+- Apply data transmission policies.
+- Keep raw logs and sensitive data local by default.
+- Send only approved metadata to the SaaS platform.
+- Buffer data during connectivity failures.
+- Retry transmission after recovery.
+- Maintain auditable egress records.
+
+TIER 2: CENTRALIZED SAAS PLATFORM
+
+The SaaS platform must:
+
+- Receive approved metadata only.
+- Support multiple tenants.
+- Display infrastructure health.
+- Display network health.
+- Display security events.
+- Display collector fleet health.
+- Detect anomalies.
+- Correlate related events.
+- Generate prioritized incidents.
+- Generate explainable recommendations.
+- Provide dashboards and alerts.
+- Enforce tenant-level separation.
+- Support future policy-controlled Autonomous Ops.
+
+==================================================
+PART 3 — MANDATORY FUNCTIONAL REQUIREMENTS
+==================================================
+
+LOCAL COLLECTOR AND SECURITY:
+
+Implement:
+
+- Telemetry collection.
+- Data normalization.
+- Field allow-listing.
+- Secret scrubbing.
+- Sensitive data redaction.
+- Pseudonymous source identifiers.
+- Local aggregation.
+- Local retention.
+- Collector authentication.
+- Encrypted communication.
+- Local SQLite queue.
+- Retry mechanism.
+- Egress audit.
+- Egress Proof Panel.
+
+The Egress Proof Panel is especially important.
+
+It must visibly show the exact contents of each payload before transmission.
+
+OBSERVABILITY:
+
+Monitor:
+
+- CPU.
+- Memory.
+- Disk.
+- Service availability.
+- Bandwidth.
+- Network latency.
+- Packet loss.
+- Connectivity.
+- Repeated authentication failures.
+- Suspicious activity.
+
+COLLECTOR HEALTH:
+
+Show:
+
+- Online/offline status.
+- Last-seen time.
+- Collector version.
+- Resource usage.
+- Configuration status.
+
+AIOPS:
+
+Implement:
+
+- Baseline calculation.
+- Anomaly detection beyond static thresholds.
+- Event correlation.
+- Incident prioritization.
+- Likely-cause identification.
+- Explainable recommendations.
+
+HEALTH CLASSIFICATION:
+
+Implement four states:
+
+1. Excellent.
+2. Good.
+3. Fair.
+4. Poor.
+
+Include configurable thresholds, reasons for classification, stale-data handling and timestamped history.
+
+GLOBAL-READY DESIGN:
+
+- Regional ingestion design.
+- Tenant data residency.
+- UTC timestamps.
+- Source timezone.
+- Out-of-order event handling.
+- Unique payload IDs.
+- Idempotent delivery.
+
+RELIABILITY:
+
+- Local buffering.
+- Exponential backoff.
+- Retry and resume.
+- Duplicate prevention.
+- Backlog delivery after outage.
+- Collector offline detection.
+- SaaS outage handling.
+
+==================================================
+PART 4 — PERFORMANCE TARGETS
+==================================================
+
+Use the performance targets specified in the official PDF.
+
+The suggested targets include:
+
+1. Collection-to-dashboard latency: within 10 seconds at the 95th percentile.
+2. Threshold breach-to-alert: within 15 seconds.
+3. Collector offline detection: within 60 seconds of last heartbeat.
+4. Post-outage backlog delivery: zero lost records and zero duplicates.
+
+Implement timestamp-based measurements.
+
+Do not claim these targets have been achieved unless they have actually been measured.
+
+==================================================
+PART 5 — EVALUATION FRAMEWORK
+==================================================
+
+The official evaluation has four phases and 100 marks.
+
+Phase 1: Problem Understanding & Ideation — 10 marks.
+
+Phase 2: Architecture & Technical Design — 25 marks.
+
+Phase 3: Implementation & Working Prototype — 35 marks.
+
+Phase 4: Final Demo, Validation & Presentation — 30 marks.
+
+Read the complete subcriteria from the attached PDF.
+
+Create a judging checklist that maps:
+
+- Every evaluation criterion.
+- Relevant project feature.
+- Implementation location.
+- Testing evidence.
+- Demonstration step.
+
+Important:
+The four evaluation phases are different from the four product health states.
+
+==================================================
+PART 6 — FOUR-MEMBER TEAM DISTRIBUTION
+==================================================
+
+The project must be divided into four independent development workspaces.
+
+MEMBER 1 — COLLECTOR AND SECURITY
+
+Workspace: collector-security
+
+Responsibilities:
+
+- Telemetry generator.
+- Local collector.
+- Data filtering.
+- Normalization.
+- Redaction.
+- Secret scrubbing.
+- Allow-list validation.
+- Pseudonymous source IDs.
+- SQLite buffer.
+- Egress audit.
+- Collector configuration.
+- Collector logs.
+
+MEMBER 2 — BACKEND AND DATABASE
+
+Workspace: backend-database
+
+Responsibilities:
+
+- FastAPI backend.
+- PostgreSQL.
+- SQLAlchemy.
+- Database models.
+- Migrations.
+- Authentication.
+- Tenant isolation.
+- Collector registration.
+- Telemetry ingestion.
+- Heartbeat APIs.
+- REST APIs.
+- WebSocket communication.
+- Backend logging.
+
+Member 2 coordinates integration but must not implement the other members' modules.
+
+MEMBER 3 — AIOPS ENGINE
+
+Workspace: aiops-engine
+
+Responsibilities:
+
+- Baseline calculation.
+- Moving average.
+- Z-score anomaly detection.
+- Optional Isolation Forest.
+- Event correlation.
+- Incident prioritization.
+- Root-cause hints.
+- Health classification.
+- Explainable recommendations.
+- AIOps tests.
+
+MEMBER 4 — FRONTEND DASHBOARD
+
+Workspace: frontend-dashboard
+
+Responsibilities:
+
+- React.
+- TypeScript.
+- Vite.
+- Tailwind CSS.
+- Recharts.
+- Lucide icons.
+- Infrastructure dashboard.
+- Network dashboard.
+- Security dashboard.
+- Collector fleet dashboard.
+- Incident dashboard.
+- Recommendation dashboard.
+- Egress Proof Panel.
+
+The frontend must use mock JSON data until backend APIs become available.
+
+==================================================
+PART 7 — TECHNOLOGY STACK
+==================================================
+
+Frontend:
+- React.
+- TypeScript.
+- Vite.
+- Tailwind CSS.
+- Recharts.
+- Lucide React.
+
+Backend:
+- Python.
+- FastAPI.
+- Pydantic.
+- SQLAlchemy.
+
+Database:
+- PostgreSQL for centralized data.
+- SQLite for local buffering and audit.
+
+AIOps:
+- Python.
+- NumPy.
+- Pandas.
+- Scikit-learn where appropriate.
+
+Infrastructure:
+- Docker.
+- Docker Compose.
+- Git.
+- Pytest.
+
+Communication:
+- REST APIs.
+- WebSockets where useful.
+- HTTPS/TLS.
+
+Keep everything practical for a 24-hour hackathon.
+
+==================================================
+PART 8 — SHARED CONTRACTS
+==================================================
+
+Before generating implementation code, define shared contracts.
+
+Create schemas for:
+
+1. Telemetry metadata.
+2. Infrastructure metrics.
+3. Network metrics.
+4. Security events.
+5. Collector heartbeat.
+6. Collector status.
+7. Incidents.
+8. Anomalies.
+9. Recommendations.
+10. Health states.
+11. Egress audit.
+12. API requests and responses.
+13. WebSocket messages.
+14. Error responses.
+
+Provide complete example JSON for each.
+
+All four members must follow the same field names, formats and identifiers.
+
+Do not allow independent developers to invent incompatible schemas.
+
+==================================================
+PART 9 — PARALLEL DEVELOPMENT
+==================================================
+
+Create documentation that allows all four members to start working immediately.
+
+For every member specify:
+
+- Responsibilities.
+- Workspace.
+- Files owned.
+- Files not to modify.
+- Dependencies.
+- Input and output contracts.
+- Mock data.
+- Commands.
+- Expected results.
+- Unit tests.
+- Integration requirements.
+
+Use Git branches:
+
+- main
+- integration
+- feature/collector-security
+- feature/backend-database
+- feature/aiops-engine
+- feature/frontend-dashboard
+
+All members should be able to develop and test independently.
+
+==================================================
+PART 10 — LOGGING AND DATABASE
+==================================================
+
+Create structured logging for:
+
+- Collector activity.
+- Telemetry processing.
+- Redaction.
+- Security events.
+- Egress audit.
+- Transmission.
+- Ingestion.
+- Authentication.
+- Tenant access.
+- Anomaly detection.
+- Incident correlation.
+- Recommendations.
+- Application errors.
+- Retry and reliability events.
+
+Never expose credentials or sensitive raw telemetry in SaaS logs.
+
+Suggested database tables:
+
+- tenants
+- collectors
+- telemetry_metadata
+- infrastructure_metrics
+- incidents
+- anomaly_events
+- recommendations
+- egress_audit
+- authentication_audit
+- collector_heartbeats
+- delivery_records
+
+Include proper relationships, indexes, constraints, timestamps and tenant isolation.
+
+==================================================
+PART 11 — DEMO SCENARIOS
+==================================================
+
+The system must support:
+
+1. Normal infrastructure monitoring.
+2. CPU spike.
+3. Memory spike.
+4. Network latency spike.
+5. Packet loss.
+6. Repeated failed logins.
+7. Event correlation.
+8. Incident generation.
+9. Explainable recommendations.
+10. Sensitive data redaction.
+11. Egress Proof Panel.
+12. SaaS outage.
+13. Local buffering.
+14. Retry and recovery.
+15. Duplicate prevention.
+16. Out-of-order events.
+17. Collector offline detection.
+18. Four health states.
+
+Autonomous remediation should be simulated or safe-test-only.
+
+==================================================
+PART 12 — 24-HOUR EXECUTION PLAN
+==================================================
+
+Create a practical 24-hour plan.
+
+0–2 hours:
+Architecture, requirements, contracts and task allocation.
+
+2–6 hours:
+Independent module foundations.
+
+6–10 hours:
+Core collector, backend, AIOps and frontend.
+
+10–14 hours:
+Redaction, ingestion, anomaly detection and dashboards.
+
+14–18 hours:
+Integration.
+
+18–21 hours:
+Testing, reliability and performance.
+
+21–24 hours:
+Bug fixes, demo and presentation.
+
+==================================================
+PART 13 — PROJECT FILE STRUCTURE
+==================================================
+
+Use a clean repository structure similar to:
+
+smart-observability/
+│
+├── docs/
+├── collector-security/
+├── backend-database/
+├── aiops-engine/
+├── frontend-dashboard/
+├── shared/
+├── sample-data/
+├── scripts/
+├── tests/
+├── logs/
+├── deployment/
+├── .env.example
+├── docker-compose.yml
+├── README.md
+└── MASTER_PROJECT.md
+
+You may improve this structure if necessary.
+
+==================================================
+PART 14 — FILE GENERATION PLAN
+==================================================
+
+Generate project documentation in this order.
+
+BATCH 1:
+1. MASTER_PROJECT.md
+2. README.md
+3. TEAM_WORK_DISTRIBUTION.md
+
+BATCH 2:
+4. ARCHITECTURE.md
+5. SYSTEM_WORKFLOW.md
+6. SECURITY_DESIGN.md
+
+BATCH 3:
+7. SHARED_CONTRACTS.md
+8. API_DOCUMENTATION.md
+9. DATABASE_SCHEMA.md
+
+BATCH 4:
+10. PARALLEL_DEVELOPMENT_PLAN.md
+11. MEMBER_EXECUTION_GUIDES.md
+12. GIT_WORKFLOW.md
+
+BATCH 5:
+13. MOCK_DATA_GUIDE.md
+14. LOGGING_ARCHITECTURE.md
+15. AIOPS_DESIGN.md
+
+BATCH 6:
+16. HEALTH_CLASSIFICATION.md
+17. RELIABILITY_DESIGN.md
+18. TESTING_STRATEGY.md
+
+BATCH 7:
+19. HACKATHON_24H_PLAN.md
+20. INTEGRATION_CHECKLIST.md
+21. HACKATHON_JUDGING_CHECKLIST.md
+
+BATCH 8:
+22. DEMO_GUIDE.md
+23. CONTRIBUTING.md
+24. FINAL_QUALITY_REPORT.md
+
+BATCH 9:
+25. .env.example
+26. docker-compose.yml
+27. SETUP_SCRIPTS.md
+
+After documentation, create an implementation file inventory.
+
+Then generate implementation files in separate three-file batches.
+
+Implementation must include:
+
+- Local collector.
+- Telemetry generator.
+- Redaction engine.
+- Allow-list validator.
+- SQLite buffer.
+- Egress audit.
+- FastAPI backend.
+- Database models.
+- Authentication.
+- Tenant isolation.
+- Ingestion APIs.
+- Heartbeat APIs.
+- AIOps engine.
+- Anomaly detection.
+- Event correlation.
+- Incident generation.
+- Recommendation engine.
+- Health classification.
+- React frontend.
+- Dashboard components.
+- Egress Proof Panel.
+- Tests.
+- Docker and startup scripts.
+
+==================================================
+PART 15 — STRICT THREE-FILE OUTPUT LIMIT
+==================================================
+
+THIS IS A CRITICAL INSTRUCTION.
+
+Generate EXACTLY THREE COMPLETE FILES PER RESPONSE.
+
+Never generate four or more files in one response.
+
+Never generate an incomplete file.
+
+Never replace file contents with summaries.
+
+For each file include:
+
+FILE NUMBER:
+FILE NAME:
+RELATIVE PATH:
+PURPOSE:
+DEPENDENCIES:
+COMPLETE CONTENT:
+
+The content must be ready to save directly into the project.
+
+Do not use incomplete placeholders.
+
+Do not regenerate completed files unnecessarily.
+
+Do not automatically continue to the next batch.
+
+At the end of every batch provide:
+
+BATCH COMPLETION REPORT:
+
+- Batch number.
+- Three completed filenames.
+- File paths.
+- Files remaining.
+- Dependencies.
+- Decisions made.
+- Validation performed.
+- Exact next three filenames.
+
+Then STOP.
+
+==================================================
+PART 16 — CONTINUATION COMMANDS
+==================================================
+
+When I type CONTINUE:
+
+- Review previous outputs.
+- Continue from the next uncompleted batch.
+- Generate exactly three new complete files.
+- Do not repeat completed files.
+- Preserve project decisions.
+- Preserve shared contracts.
+- Stop after three files.
+
+When I type STATUS:
+
+Show:
+- Completed batches.
+- Completed files.
+- Remaining files.
+- Current architecture.
+- Shared contracts.
+- Outstanding issues.
+- Next three files.
+
+When I type FIX [filename]:
+
+Correct only the requested file and identify any dependent files that need updates.
+
+When I type PROJECT_CONTEXT:
+
+Generate a complete project context summary containing:
+- Official requirements.
+- Architecture.
+- Technology stack.
+- Team responsibilities.
+- Shared schemas.
+- Completed files.
+- Pending files.
+- Important decisions.
+- Next development steps.
+
+==================================================
+PART 17 — QUALITY RULES
+==================================================
+
+Before generating every batch:
+
+1. Check the official PDF.
+2. Check previous files.
+3. Check shared contracts.
+4. Check architecture consistency.
+5. Check member responsibilities.
+6. Check dependencies.
+
+After generating every batch:
+
+1. Confirm exactly three files.
+2. Confirm all three are complete.
+3. Confirm naming consistency.
+4. Confirm no schema conflicts.
+5. Provide the completion report.
+
+Never claim that software has been executed or tested unless it actually has been.
+
+Do not overengineer.
+
+Prioritize a working end-to-end prototype over unnecessary complexity.
+
+==================================================
+PART 18 — YOUR FIRST RESPONSE
+==================================================
+
+Do not generate code immediately.
+
+First analyze the complete official PDF.
+
+Then provide:
+
+1. Problem statement analysis.
+2. Mandatory requirements.
+3. Optional and bonus features.
+4. Complete four-phase evaluation rubric.
+5. Two-tier architecture explanation.
+6. Recommended technology stack.
+7. Four-member task distribution.
+8. Shared contract strategy.
+9. Proposed repository structure.
+10. Minimum viable demo.
+11. Major technical risks.
+12. Complete file-generation plan.
+
+After this analysis, generate BATCH 1 containing exactly:
+
+1. MASTER_PROJECT.md
+2. README.md
+3. TEAM_WORK_DISTRIBUTION.md
+
+Generate all three files completely.
+
+Then STOP and wait for my CONTINUE command.
+
+REMEMBER:
+
+This is a fresh account and a fresh conversation. Use only the attached official PDF and the instructions in this prompt as your starting context.
+
+Three complete files per response. No exceptions.

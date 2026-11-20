@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Keep example environment file
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+# Separate nested repository
+smart-observability-aiops/
