@@ -10,6 +10,16 @@
     "source_timezone",
     "data"
   ],
+  "required_envelope_fields": [
+    "payload_id",
+    "tenant_id",
+    "collector_id",
+    "source_id",
+    "event_type",
+    "event_time_utc",
+    "source_timezone",
+    "data"
+  ],
   "event_types": {
     "infrastructure": {
       "allowed_data_fields": [

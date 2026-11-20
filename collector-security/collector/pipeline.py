@@ -87,7 +87,7 @@ class CollectorPipeline:
                 "severity": severity,
                 "count": count,
                 "window_seconds": int(window),
-                "context": summary_context,
+                "context": {"summary": summary_context},
             },
         }
 

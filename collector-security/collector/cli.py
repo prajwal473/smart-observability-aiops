@@ -5,7 +5,7 @@ import json
 import signal
 import sys
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from collector.config import CollectorConfig
 from collector.generator import TelemetryGenerator
@@ -31,13 +31,43 @@ def _cmd_status(cfg: CollectorConfig, store: CollectorStore) -> int:
     output = {
         "collector_id": cfg.collector_id,
         "tenant_id": cfg.tenant_id,
-        "saas_base_url": cfg.saas_base_url,
         "sqlite_path": str(cfg.sqlite_path),
         "raw_events_local_count": int(raw_count),
         "egress_audit_count": int(audit_count),
         "queue": stats,
+        "retention": {
+            "raw_events_hours": cfg.local_retention_hours,
+            "egress_audit": "indefinite",
+        },
     }
     print(json.dumps(output, indent=2))
+    return 0
+
+
+def _cleanup_raw_events(
+    cfg: CollectorConfig,
+    store: CollectorStore,
+    logger: Optional[Any] = None,
+) -> dict[str, Any]:
+    result = store.cleanup_raw_events(cfg.local_retention_hours)
+    if logger is not None:
+        logger.info(
+            "Raw event retention cleanup completed",
+            extra={
+                "category": "collector_activity",
+                "event": "retention.raw_cleanup",
+                "tenant_id": cfg.tenant_id,
+                "collector_id": cfg.collector_id,
+                "details": result,
+            },
+        )
+    return result
+
+
+def _cmd_cleanup(cfg: CollectorConfig, store: CollectorStore) -> int:
+    result = _cleanup_raw_events(cfg, store)
+    result["egress_audit_retention"] = "indefinite"
+    print(json.dumps(result, indent=2))
     return 0
 
 
@@ -96,6 +126,7 @@ def _cmd_generate(
     count: Optional[int],
     transmit: bool,
 ) -> int:
+    retention_cleanup = _cleanup_raw_events(cfg, store)
     gen = TelemetryGenerator(
         seed=cfg.generator_seed,
         mode=mode,
@@ -134,6 +165,7 @@ def _cmd_generate(
                 "batches_generated": batches,
                 "enqueued_payloads": enqueued_total,
                 "queue": store.get_queue_stats(),
+                "retention_cleanup": retention_cleanup,
             },
             indent=2,
         )
@@ -162,9 +194,12 @@ def _cmd_run(cfg: CollectorConfig, store: CollectorStore) -> int:
             "event": "collector.started",
             "tenant_id": cfg.tenant_id,
             "collector_id": cfg.collector_id,
-            "details": {"mode": cfg.generator_mode, "saas_base_url": cfg.saas_base_url},
+            "details": {"mode": cfg.generator_mode},
         },
     )
+
+    _cleanup_raw_events(cfg, store, logger)
+    last_cleanup = time.monotonic()
 
     last_collect = 0.0
     last_send = 0.0
@@ -172,6 +207,10 @@ def _cmd_run(cfg: CollectorConfig, store: CollectorStore) -> int:
 
     while not stop_flag.stop:
         now = time.monotonic()
+        if now - last_cleanup >= 3600:
+            _cleanup_raw_events(cfg, store, logger)
+            last_cleanup = now
+
         if (now - last_collect) >= cfg.collect_interval_seconds:
             for raw_ev in gen.generate_raw_batch():
                 pipe.process_raw_event(raw_ev)
@@ -219,6 +258,8 @@ def build_parser() -> argparse.ArgumentParser:
     aud_p = sub.add_parser("audit", help="Show recent egress audit entries")
     aud_p.add_argument("--last", type=int, default=10)
 
+    sub.add_parser("cleanup", help="Delete expired local raw events; preserve queue and audit records")
+
     return parser
 
 
@@ -245,6 +286,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             return _cmd_status(cfg, store)
         if args.command == "audit":
             return _cmd_audit(cfg, store, last_n=args.last)
+        if args.command == "cleanup":
+            return _cmd_cleanup(cfg, store)
         return 1
     finally:
         store.close()

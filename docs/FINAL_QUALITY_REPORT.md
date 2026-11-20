@@ -2,8 +2,8 @@
 
 Project: Smart Observability and AIOps Platform (CICADA 2026)
 
-> **Status: TEMPLATE — NOT YET COMPLETED.**
-> This report is generated before the system has been built or run. Every result field below is blank on purpose. Fill each field only with something actually run or measured. Leave "Not tested" where that is the truth. Nothing here should be read as evidence that any requirement has been met.
+> **Status: PARTIALLY VERIFIED (2026-11-20).**
+> The current collector implementation test suite passed 62 tests during the follow-up audit recorded in §6. A preceding audit of the then-current branch state recorded 58 passing tests. These are implementation test results, not reliability drills. G1–G9 below remain historical isolated-run evidence and were not rerun during this update. G7 remains unverified and G8 failed. Blank sections remain unassessed; a blank is not a pass. The historical live integration record at the end is retained as originally recorded and was not revalidated during this update.
 
 Report prepared by: ____________  Date/time (UTC): ____________  Git commit: ____________
 
@@ -13,15 +13,15 @@ Report prepared by: ____________  Date/time (UTC): ____________  Git commit: ___
 
 | Item | Value |
 |---|---|
-| Overall readiness (own assessment) | |
+| Overall readiness (own assessment) | Partial; collector outage buffering and crash recovery passed isolated drills, but offline detection failed and dashboard verification remains incomplete |
 | Mandatory requirements implemented | __ / __ |
 | Mandatory requirements verified by test or demo | __ / __ |
-| Known critical defects open | |
+| Known high-severity defects open | Backend collector offline/online status detection is absent |
 | Demo scenarios working (of 18) | __ / 18 |
 
 Short narrative (3–5 sentences, written after testing):
 
-> 
+> Isolated outage drills G1–G6 passed: the collector buffered records during backend downtime, retried with increasing backoff, and automatically delivered the backlog with no missing or duplicate payload IDs. G7 remains unverified because the dashboard was unavailable. G8 offline detection failed: the backend exposed no offline status and the heartbeat timestamp remained stale beyond 60 seconds. G9 crash/restart recovery passed: all 70 payload IDs present before the final forced termination were later delivered, with zero backend duplicates. Other blank areas of this report remain unassessed.
 
 ## 2. Mandatory Requirement Status
 
@@ -59,7 +59,7 @@ Status values: `Not started`, `Partial`, `Implemented`, `Verified`, `Not impleme
 | 27 | Out-of-order handling | | | |
 | 28 | Unique payload IDs and idempotent delivery | | | |
 | 29 | Regional ingestion / data residency design | | | |
-| 30 | Offline detection and SaaS outage handling | | | |
+| 30 | Offline detection and SaaS outage handling | Partial | G1–G6 and G8/G9 evidence below | Outage buffering, retry, and recovery were verified; backend offline/online status detection failed. |
 
 Add any further mandatory items from the official PDF here (the PDF was not available when this template was created).
 
@@ -71,11 +71,35 @@ Method: timestamps recorded at collection, send, ingest, and dashboard render; m
 |---|---|---|---|---|---|---|
 | Collection-to-dashboard latency, p95 | ≤ 10 s | | | | | |
 | Threshold breach-to-alert | ≤ 15 s | | | | | |
-| Collector offline detection after last heartbeat | ≤ 60 s | | | | | |
-| Post-outage backlog: records lost | 0 | | | | | |
-| Post-outage backlog: duplicates | 0 | | | | | |
+| Collector offline detection after last heartbeat | ≤ 60 s | No offline status exposed; `last_seen_utc` was unchanged 132.885 s after its recorded value | 1 isolated collector | Heartbeats stopped; backend remained up | No | `g9_offline_threshold_check.json`; backend model/API inspection |
+| Post-outage backlog: records lost | 0 | 0 among 206 queued IDs in G1–G6 recovery; 0 among 70 pre-kill IDs in G9 recovery | 206 + 70 checked | Isolated temporary SQLite databases and dedicated test tenant/collector | Yes, for the checked queue IDs | `recovery_final.json`; `g8_recovery_complete.json` |
+| Post-outage backlog: duplicates | 0 | 0 duplicate backend `payload_id` values | 206 + 160 final snapshot rows | Isolated G1–G6 and G8/G9 runs | Yes | `recovery_final.json`; `g8_recovery_complete.json`; `g9_final.json` |
 
-Outage drill record: outage duration ____; records generated ____; records stored ____; duplicate `payload_id` count ____.
+Outage drill record: G1–G6 queue count at G3 was **N = 6 pending** at 19:53:34 UTC. At the fully drained recovery snapshot (19:55:22 UTC), queue, audit, and backend each had 206 records; the queue/backend payload-ID sets matched and there were zero duplicates. The exact backend stop/start duration and the exact number generated only during the outage were not isolated in the snapshots and are therefore not claimed here.
+
+### Historical Reliability / Outage Drill Results (G1–G9)
+
+Results below distinguish measured outcomes from requirements that could not be verified. G1–G7 evidence is from the earlier isolated drill; G8/G9 evidence is from the separate isolated crash/status drill. Neither drill used `collector-security/data/collector.db`.
+
+| Drill | Result | Measured evidence |
+|---|---|---|
+| G1 — Backend stopped; collector continues and queues locally | **PASS** | At 19:53:07 UTC, 4 payloads were pending and 86 delivered; by 19:53:34 UTC, 6 were pending and collection/audit count had continued to 92. |
+| G2 — At least three retries and growing backoff | **PASS** | Collector logs show repeated retry events for the same payloads: attempts 1, 2, and 3 with scheduled delays increasing through 1, 2, and 4 seconds and reaching the configured 20-second cap. |
+| G3 — Record queued count | **PASS** | `N = 6` pending at 19:53:34 UTC. |
+| G4 — Backend recovery and automatic backlog delivery | **PASS** | No manual replay was used. At 19:54:26 UTC, all 118 then-queued records were delivered; the later drained snapshot had 206 delivered. |
+| G5 — Compare queued/delivered payloads | **PASS** | At 19:55:22 UTC, 206 queue rows and 206 backend records had identical payload-ID sets; all queue rows were delivered. |
+| G6 — Duplicate backend payload IDs | **PASS** | Zero duplicate IDs in the fully drained backend snapshot. |
+| G7 — Dashboard backlog timestamps/order | **NOT VERIFIED** | Dashboard component was unavailable. Backend data ordered by `event_time_utc` was monotonic, but that does not verify dashboard rendering. |
+| G8 — Offline detection within 60 seconds | **FAIL** | Last heartbeat was `2026-11-20 20:10:00.865318` UTC. At 20:11:21.176063 UTC (80.311 s later) it was unchanged; at 20:12:13.750378 UTC it was still unchanged (132.885 s later). The backend collector model has no online/offline field, OpenAPI exposes only the heartbeat POST route, and GET collector detail returned 404. |
+| G9 — Crash/restart recovery | **PASS** | Immediately before the final `SIGKILL` at 20:08:28.506436 UTC, the isolated queue had 70 IDs: 1 in-flight, 7 pending, 62 delivered. The 20:08:28.535210 snapshot retained all 70. After restart/recovery, all 70 pre-kill IDs were present in the backend and delivered; the 20:09:54.521030 snapshot had 160/160 delivered and zero duplicate backend IDs. |
+
+**Evidence directories:**
+
+- G1–G7 snapshots: `/tmp/cicada-g-drill.1SRENM/evidence/`; collector retry log: `/tmp/cicada-g-drill.1SRENM/logs/collector/collector.log`.
+- G8/G9 snapshots: `/tmp/cicada-g8-g9.JrJ9zW/evidence/`; collector log: `/tmp/cicada-g8-g9.JrJ9zW/logs/collector/collector.log`.
+- G8/G9 used `/tmp/cicada-g8-g9.JrJ9zW/collector.sqlite` and `/tmp/cicada-g8-g9.JrJ9zW/backend.sqlite`, with a dedicated test tenant and collector. These evidence artifacts were preserved after the drill.
+
+**Verified versus unverified:** G1–G6 and G9 are supported by queue/backend snapshots and logs. G7 is not a dashboard test. G8 is a measured failure, not an inferred pass: the backend recorded a stale heartbeat but did not expose or transition an offline status. A later heartbeat advanced `last_seen_utc` to `2026-11-20 20:12:35.443803` UTC; this verifies heartbeat receipt resumed, not an online-status transition.
 
 If any target was missed, explain why and what would fix it:
 
@@ -122,7 +146,7 @@ If any target was missed, explain why and what would fix it:
 
 | Module | Command run | Tests passed / total | Date/time | Notes |
 |---|---|---|---|---|
-| collector-security | | | | |
+| collector-security | `python -m pytest -q` (from `collector-security/`) | 62 passed (latest follow-up run; preceding final audit recorded 58 passed) | 2026-11-20 | Current collector implementation tests, including the auth batch-reschedule and Docker URL validation regressions. This is separate from the historical G1–G9 reliability-drill evidence below; no drills were rerun for this result. |
 | backend-database | | | | |
 | aiops-engine | | | | |
 | frontend-dashboard | | | | |
@@ -144,7 +168,8 @@ Use the official PDF's sub-criteria. Totals per phase from the project brief.
 
 | ID | Description | Severity | Workaround | Planned fix |
 |---|---|---|---|---|
-| | | | | |
+| R1 | Backend does not compute or expose collector offline/online status; G8 missed the 60-second status requirement. | High | Treat `last_seen_utc` as heartbeat evidence only; do not display an unverified online/offline state. | Implement and test offline detection plus online recovery reporting. |
+| R2 | Dashboard backlog ordering was not verified because the dashboard component was unavailable during G7. | Medium | Backend `event_time_utc` ordering was checked; dashboard behavior remains unknown. | Run G7 against the dashboard and verify displayed timestamps and order. |
 
 Items to state openly:
 - Autonomous Ops is simulated / safe-test-only (if that is the case).

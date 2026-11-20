@@ -62,6 +62,23 @@ class CollectorSender:
             return self.config.saas_ca_bundle_path
         return True
 
+    def _exception_error_summary(self, exc: Exception) -> str:
+        if isinstance(exc, requests.exceptions.SSLError):
+            category, message = "tls_error", "TLS connection or certificate verification failed."
+        elif isinstance(exc, requests.exceptions.Timeout):
+            category, message = "timeout", "The request timed out."
+        elif isinstance(exc, requests.exceptions.ConnectionError):
+            category, message = "connection_error", "The connection to the backend failed."
+        elif isinstance(exc, requests.exceptions.RequestException):
+            category, message = "request_error", "The HTTP request failed."
+        else:
+            category, message = "unexpected_error", "The sender encountered an unexpected error."
+        return f"ERROR [{category}]: {message} Exception details omitted."
+
+    @staticmethod
+    def _http_error_summary(status_code: int, category: str, message: str) -> str:
+        return f"HTTP {status_code} [{category}]: {message}"
+
     def send_batch_once(self, batch_size: Optional[int] = None) -> dict[str, Any]:
         if self.auth_paused:
             self.logger.warning(
@@ -86,7 +103,7 @@ class CollectorSender:
         url = f"{self.config.saas_base_url}/v1/ingest"
         timeout = (self.config.connect_timeout_seconds, self.config.read_timeout_seconds)
 
-        for item in batch:
+        for item_index, item in enumerate(batch):
             pid = item["payload_id"]
             try:
                 resp = self.session.post(
@@ -143,8 +160,17 @@ class CollectorSender:
                         self.config.retry_jitter_seconds,
                         rng=self.rng,
                     )
-                    self.store.reschedule_retry(pid, delay, f"HTTP {code} auth error")
-                    failed_count += 1
+                    error_summary = self._http_error_summary(
+                        code, "authentication_error", "Authentication was rejected; transmission paused."
+                    )
+                    # fetch_due_batch has already marked every row in the batch
+                    # in_flight. Return the current and untouched rows to pending
+                    # before pausing so none are stranded until process restart.
+                    for unprocessed in batch[item_index:]:
+                        self.store.reschedule_retry(
+                            unprocessed["payload_id"], delay, error_summary
+                        )
+                    failed_count += len(batch) - item_index
                     self.logger.warning(
                         "Collector authentication rejected; pausing transmission",
                         extra={
@@ -158,7 +184,14 @@ class CollectorSender:
                     )
                     break
                 elif code in (400, 422):
-                    self.store.mark_rejected(pid, f"HTTP {code}: {resp.text[:180]}")
+                    self.store.mark_rejected(
+                        pid,
+                        self._http_error_summary(
+                            code,
+                            "schema_rejected",
+                            "The backend rejected the payload; response body omitted.",
+                        ),
+                    )
                     rejected_count += 1
                     self.logger.error(
                         "Payload permanently rejected by schema validation",
@@ -181,7 +214,13 @@ class CollectorSender:
                         self.config.retry_jitter_seconds,
                         rng=self.rng,
                     )
-                    self.store.reschedule_retry(pid, delay, f"HTTP {code}")
+                    self.store.reschedule_retry(
+                        pid,
+                        delay,
+                        self._http_error_summary(
+                            code, "transient_http_error", "The backend returned a retryable response."
+                        ),
+                    )
                     failed_count += 1
                     self.logger.warning(
                         "Transient ingest response; scheduled retry",
@@ -204,7 +243,7 @@ class CollectorSender:
                     self.config.retry_jitter_seconds,
                     rng=self.rng,
                 )
-                self.store.reschedule_retry(pid, delay, str(exc))
+                self.store.reschedule_retry(pid, delay, self._exception_error_summary(exc))
                 failed_count += 1
                 self.logger.warning(
                     "SaaS unreachable; payload remains buffered for retry",
