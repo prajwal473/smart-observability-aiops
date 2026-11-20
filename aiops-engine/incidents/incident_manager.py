@@ -1,0 +1,421 @@
+from copy import deepcopy
+from datetime import datetime, timezone
+
+
+class IncidentManager:
+    """
+    Manages incident registration, updates, lifecycle transitions,
+    and incident history.
+
+    Supported statuses:
+        open
+        acknowledged
+        resolved
+
+    The shared incident JSON structure is preserved.
+    History is maintained separately.
+    """
+
+    VALID_STATUSES = {
+        "open",
+        "acknowledged",
+        "resolved"
+    }
+
+    SEVERITY_RANK = {
+        "low": 1,
+        "medium": 2,
+        "high": 3,
+        "critical": 4
+    }
+
+    def __init__(self):
+
+        self.incidents = {}
+        self.history = {}
+
+    @staticmethod
+    def _validate_timestamp(timestamp):
+
+        if not isinstance(timestamp, str) or not timestamp:
+            raise ValueError("Timestamp must be a non-empty string")
+
+        try:
+            parsed = datetime.fromisoformat(
+                timestamp.replace("Z", "+00:00")
+            )
+
+        except ValueError:
+            raise ValueError("Invalid ISO-8601 timestamp")
+
+        if parsed.tzinfo is None:
+            raise ValueError("Timestamp must include timezone")
+
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _validate_actor(actor_id):
+
+        if (
+            not isinstance(actor_id, str)
+            or not actor_id.strip()
+        ):
+            raise ValueError("Actor ID must be a non-empty string")
+
+    @staticmethod
+    def _validate_incident(incident):
+
+        if not isinstance(incident, dict):
+            raise ValueError("Incident must be a dictionary")
+
+        required_fields = [
+            "incident_id",
+            "tenant_id",
+            "title",
+            "severity",
+            "status",
+            "opened_at_utc",
+            "updated_at_utc",
+            "affected_source_ids",
+            "contributing_anomaly_ids",
+            "recommendation_id"
+        ]
+
+        for field in required_fields:
+
+            if field not in incident:
+                raise ValueError(
+                    f"Missing incident field: {field}"
+                )
+
+        if (
+            not isinstance(incident["incident_id"], str)
+            or not incident["incident_id"].strip()
+        ):
+            raise ValueError("Invalid incident ID")
+
+        if incident["status"] not in IncidentManager.VALID_STATUSES:
+            raise ValueError("Invalid incident status")
+
+        if (
+            not isinstance(incident["tenant_id"], str)
+            or not incident["tenant_id"].strip()
+        ):
+            raise ValueError("Invalid tenant ID")
+
+        if (
+            not isinstance(incident["title"], str)
+            or not incident["title"].strip()
+        ):
+            raise ValueError("Invalid incident title")
+
+        if (
+            not isinstance(incident["severity"], str)
+            or not incident["severity"].strip()
+        ):
+            raise ValueError("Invalid incident severity")
+
+        if not isinstance(incident["affected_source_ids"], list):
+            raise ValueError("affected_source_ids must be a list")
+
+        if not isinstance(incident["contributing_anomaly_ids"], list):
+            raise ValueError("contributing_anomaly_ids must be a list")
+
+        for source_id in incident["affected_source_ids"]:
+
+            if not isinstance(source_id, str) or not source_id.strip():
+                raise ValueError("Invalid affected source ID")
+
+        for anomaly_id in incident["contributing_anomaly_ids"]:
+
+            if not isinstance(anomaly_id, str) or not anomaly_id.strip():
+                raise ValueError("Invalid contributing anomaly ID")
+
+        IncidentManager._validate_timestamp(
+            incident["opened_at_utc"]
+        )
+
+        IncidentManager._validate_timestamp(
+            incident["updated_at_utc"]
+        )
+
+    def register_incident(self, incident):
+
+        """
+        Registers a newly created incident.
+
+        Duplicate incident IDs are rejected.
+        """
+
+        self._validate_incident(incident)
+
+        incident_id = incident["incident_id"]
+
+        if incident_id in self.incidents:
+            raise ValueError(
+                f"Incident already exists: {incident_id}"
+            )
+
+        if incident["status"] != "open":
+            raise ValueError(
+                "New incidents must have open status"
+            )
+
+        stored_incident = deepcopy(incident)
+
+        self.incidents[incident_id] = stored_incident
+
+        self.history[incident_id] = []
+
+        self._record_history(
+            incident_id=incident_id,
+            event="created",
+            previous_status=None,
+            new_status="open",
+            actor_id="system",
+            timestamp_utc=incident["opened_at_utc"]
+        )
+
+        return deepcopy(stored_incident)
+
+    def update_incident(self, incident):
+
+        """
+        Updates an existing incident with newly correlated information.
+
+        Existing lifecycle status is preserved.
+        Resolved incidents cannot be updated.
+        """
+
+        self._validate_incident(incident)
+
+        incident_id = incident["incident_id"]
+
+        stored = self._get_stored_incident(incident_id)
+
+        if stored["tenant_id"] != incident["tenant_id"]:
+            raise ValueError(
+                "Incident tenant cannot be changed"
+            )
+
+        if stored["status"] == "resolved":
+            raise ValueError(
+                "Resolved incidents cannot be updated"
+            )
+
+        previous_status = stored["status"]
+
+        incoming_timestamp = self._validate_timestamp(
+            incident["updated_at_utc"]
+        )
+
+        stored_timestamp = self._validate_timestamp(
+            stored["updated_at_utc"]
+        )
+
+        latest_timestamp = max(
+            incoming_timestamp,
+            stored_timestamp
+        )
+
+        stored["updated_at_utc"] = (
+            latest_timestamp.isoformat().replace("+00:00", "Z")
+        )
+
+        stored["title"] = incident["title"]
+
+        existing_severity = stored["severity"].lower()
+        incoming_severity = incident["severity"].lower()
+
+        existing_rank = self.SEVERITY_RANK.get(
+            existing_severity,
+            0
+        )
+
+        incoming_rank = self.SEVERITY_RANK.get(
+            incoming_severity,
+            0
+        )
+
+        if incoming_rank >= existing_rank:
+            stored["severity"] = incident["severity"]
+
+        stored["affected_source_ids"] = list(dict.fromkeys(
+            stored["affected_source_ids"]
+            + incident["affected_source_ids"]
+        ))
+
+        stored["contributing_anomaly_ids"] = list(dict.fromkeys(
+            stored["contributing_anomaly_ids"]
+            + incident["contributing_anomaly_ids"]
+        ))
+
+        if incident["recommendation_id"] is not None:
+            stored["recommendation_id"] = incident["recommendation_id"]
+
+        self._record_history(
+            incident_id=incident_id,
+            event="updated",
+            previous_status=previous_status,
+            new_status=previous_status,
+            actor_id="system",
+            timestamp_utc=stored["updated_at_utc"]
+        )
+
+        return deepcopy(stored)
+
+    def _record_history(
+        self,
+        incident_id,
+        event,
+        previous_status,
+        new_status,
+        actor_id,
+        timestamp_utc
+    ):
+
+        self.history[incident_id].append({
+            "event": event,
+            "previous_status": previous_status,
+            "new_status": new_status,
+            "actor_id": actor_id,
+            "timestamp_utc": timestamp_utc
+        })
+
+    def _get_stored_incident(self, incident_id):
+
+        if incident_id not in self.incidents:
+            raise ValueError(
+                f"Incident not found: {incident_id}"
+            )
+
+        return self.incidents[incident_id]
+
+    def acknowledge(
+        self,
+        incident_id,
+        actor_id,
+        timestamp_utc
+    ):
+
+        """
+        Changes an open incident to acknowledged.
+        """
+
+        self._validate_actor(actor_id)
+        self._validate_timestamp(timestamp_utc)
+
+        incident = self._get_stored_incident(incident_id)
+
+        if incident["status"] != "open":
+            raise ValueError(
+                "Only open incidents can be acknowledged"
+            )
+
+        previous_status = incident["status"]
+
+        incident["status"] = "acknowledged"
+        incident["updated_at_utc"] = timestamp_utc
+
+        self._record_history(
+            incident_id=incident_id,
+            event="acknowledged",
+            previous_status=previous_status,
+            new_status="acknowledged",
+            actor_id=actor_id,
+            timestamp_utc=timestamp_utc
+        )
+
+        return deepcopy(incident)
+
+    def resolve(
+        self,
+        incident_id,
+        actor_id,
+        timestamp_utc
+    ):
+
+        """
+        Resolves an open or acknowledged incident.
+        """
+
+        self._validate_actor(actor_id)
+        self._validate_timestamp(timestamp_utc)
+
+        incident = self._get_stored_incident(incident_id)
+
+        if incident["status"] == "resolved":
+            raise ValueError(
+                "Incident is already resolved"
+            )
+
+        previous_status = incident["status"]
+
+        incident["status"] = "resolved"
+        incident["updated_at_utc"] = timestamp_utc
+
+        self._record_history(
+            incident_id=incident_id,
+            event="resolved",
+            previous_status=previous_status,
+            new_status="resolved",
+            actor_id=actor_id,
+            timestamp_utc=timestamp_utc
+        )
+
+        return deepcopy(incident)
+
+    def get_incident(self, incident_id):
+
+        """
+        Returns a copy of an incident.
+        """
+
+        incident = self._get_stored_incident(incident_id)
+
+        return deepcopy(incident)
+
+    def get_history(self, incident_id):
+
+        """
+        Returns the status-change history of an incident.
+        """
+
+        self._get_stored_incident(incident_id)
+
+        return deepcopy(
+            self.history[incident_id]
+        )
+
+    def list_incidents(
+        self,
+        tenant_id=None,
+        status=None
+    ):
+
+        """
+        Lists incidents with optional tenant and status filters.
+        """
+
+        if status is not None and status not in self.VALID_STATUSES:
+            raise ValueError("Invalid status filter")
+
+        results = []
+
+        for incident in self.incidents.values():
+
+            if (
+                tenant_id is not None
+                and incident["tenant_id"] != tenant_id
+            ):
+                continue
+
+            if (
+                status is not None
+                and incident["status"] != status
+            ):
+                continue
+
+            results.append(deepcopy(incident))
+
+        return results
