@@ -14,11 +14,20 @@ DEFAULT_ALLOWLIST: dict[str, Any] = {
         "event_type",
         "event_time_utc",
         "source_timezone",
-        "received_at_utc",
+        "data",
+    ],
+    "required_envelope_fields": [
+        "payload_id",
+        "tenant_id",
+        "collector_id",
+        "source_id",
+        "event_type",
+        "event_time_utc",
+        "source_timezone",
         "data",
     ],
     "event_types": {
-        "infrastructure_metrics": {
+        "infrastructure": {
             "allowed_data_fields": [
                 "cpu_pct",
                 "memory_pct",
@@ -28,7 +37,7 @@ DEFAULT_ALLOWLIST: dict[str, Any] = {
             ],
             "free_text_fields": ["service_name"],
         },
-        "network_metrics": {
+        "network": {
             "allowed_data_fields": [
                 "bandwidth_mbps",
                 "latency_ms",
@@ -37,7 +46,7 @@ DEFAULT_ALLOWLIST: dict[str, Any] = {
             ],
             "free_text_fields": [],
         },
-        "security_events": {
+        "security": {
             "allowed_data_fields": [
                 "event_category",
                 "severity",
@@ -47,7 +56,7 @@ DEFAULT_ALLOWLIST: dict[str, Any] = {
             ],
             "free_text_fields": ["context"],
         },
-        "collector_heartbeat": {
+        "heartbeat": {
             "allowed_data_fields": [
                 "collector_version",
                 "resource_cpu_pct",
@@ -67,6 +76,9 @@ class AllowlistValidator:
     def __init__(self, spec: Optional[dict[str, Any]] = None) -> None:
         self.spec = spec or DEFAULT_ALLOWLIST
         self.envelope_fields: set[str] = set(self.spec.get("envelope_fields", []))
+        self.required_envelope_fields: set[str] = set(
+            self.spec.get("required_envelope_fields", self.envelope_fields)
+        )
         self.event_types: dict[str, dict[str, Any]] = self.spec.get("event_types", {})
 
     @classmethod
@@ -100,6 +112,10 @@ class AllowlistValidator:
         """
         if not isinstance(envelope, dict):
             raise ValueError("Envelope must be a dict")
+
+        missing = self.required_envelope_fields - envelope.keys()
+        if missing:
+            raise ValueError(f"Required envelope fields missing: {sorted(missing)}")
 
         event_type = str(envelope.get("event_type", ""))
         if event_type not in self.event_types:

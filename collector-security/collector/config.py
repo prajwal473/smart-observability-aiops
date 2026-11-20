@@ -1,9 +1,121 @@
 from __future__ import annotations
 
+import ipaddress
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
+
+
+class CollectorConfigurationError(ValueError):
+    """Raised when collector settings violate the selected environment's requirements."""
+
+
+_DEVELOPMENT_TOKENS = {
+    "dev-collector-token",
+    "development-token",
+    "test-token",
+    "dummy-token",
+    "replace-with-token-from-seed-script",
+    "change-me-dev-only",
+    "changeme",
+    "your-token-here",
+}
+_DEVELOPMENT_SALTS = {
+    "dev-pseudonym-salt-change-in-prod",
+    "replace-with-generated-salt",
+    "changeme",
+    "your-secret-here",
+}
+MIN_PRODUCTION_TOKEN_BYTES = 32
+
+
+def _production_config_errors(config: "CollectorConfig") -> list[str]:
+    errors: list[str] = []
+    environment = config.app_env.strip().lower()
+
+    if environment not in {"development", "demo", "production"}:
+        errors.append("APP_ENV must be development, demo, or production.")
+        return errors
+
+    try:
+        parsed_url = urlsplit(config.saas_base_url)
+        hostname = (parsed_url.hostname or "").lower()
+        port = parsed_url.port
+    except ValueError:
+        parsed_url = None
+        hostname = ""
+        port = None
+
+    if parsed_url is None or parsed_url.scheme not in {"http", "https"} or not hostname:
+        errors.append("SAAS_BASE_URL must be a valid HTTP or HTTPS URL with a hostname.")
+        return errors
+
+    if parsed_url.scheme == "http" and environment in {"development", "demo"}:
+        is_localhost = hostname == "localhost"
+        try:
+            is_loopback = ipaddress.ip_address(hostname).is_loopback
+        except ValueError:
+            is_loopback = False
+        is_internal_docker_backend = (
+            hostname == "backend"
+            and port == 8000
+            and parsed_url.username is None
+            and parsed_url.password is None
+            and parsed_url.path in {"", "/"}
+            and not parsed_url.query
+            and not parsed_url.fragment
+        )
+        if not (is_localhost or is_loopback or is_internal_docker_backend):
+            errors.append(
+                "SAAS_BASE_URL may use HTTP only with localhost or a loopback address, "
+                "or the internal Docker service backend:8000."
+            )
+
+    if not math.isfinite(config.queue_max_mb) or config.queue_max_mb <= 0:
+        errors.append("COLLECTOR_QUEUE_MAX_MB must be greater than zero.")
+    if config.local_retention_hours <= 0:
+        errors.append("COLLECTOR_LOCAL_RETENTION_HOURS must be greater than zero.")
+
+    if environment == "production":
+        if parsed_url.scheme != "https":
+            errors.append("SAAS_BASE_URL must use HTTPS when APP_ENV=production.")
+        if not config.saas_verify_tls:
+            errors.append("SAAS_VERIFY_TLS must be true when APP_ENV=production.")
+        if parsed_url.username is not None or parsed_url.password is not None:
+            errors.append("SAAS_BASE_URL must not contain embedded credentials.")
+        if parsed_url.query or parsed_url.fragment:
+            errors.append("SAAS_BASE_URL must not contain a query string or fragment.")
+
+        token = config.collector_token.strip()
+        token_lower = token.lower()
+        if (
+            len(token.encode("utf-8")) < MIN_PRODUCTION_TOKEN_BYTES
+            or token_lower in _DEVELOPMENT_TOKENS
+            or token_lower.startswith(
+                ("replace-with-", "change-me", "dev-", "test-", "dummy-")
+            )
+        ):
+            errors.append(
+                "COLLECTOR_TOKEN must be a non-default registered token of at least "
+                f"{MIN_PRODUCTION_TOKEN_BYTES} bytes. Generate one with "
+                "secrets.token_urlsafe(32)."
+            )
+
+        salt = config.pseudonym_salt.strip()
+        salt_lower = salt.lower()
+        if (
+            len(salt.encode("utf-8")) < 32
+            or len(set(salt)) < 16
+            or salt_lower in _DEVELOPMENT_SALTS
+            or salt_lower.startswith(("replace-with-", "change-me", "dev-", "test-", "dummy-"))
+        ):
+            errors.append(
+                "PSEUDONYM_SALT must be a non-default value of at least 32 bytes with at least 16 distinct characters."
+            )
+    return errors
 
 
 def _load_dotenv_if_present(env_path: Optional[Path]) -> None:
@@ -43,9 +155,10 @@ def _env_bool(key: str, default: bool) -> bool:
 
 @dataclass
 class CollectorConfig:
+    app_env: str = "development"
     collector_id: str = "col_acme_blr_01"
     tenant_id: str = "tnt_acme_001"
-    collector_token: str = "dev-collector-token"
+    collector_token: str = field(default="dev-collector-token", repr=False)
     collector_version: str = "0.1.0"
     source_timezone: str = "Asia/Kolkata"
     saas_base_url: str = "http://localhost:8000"
@@ -70,7 +183,7 @@ class CollectorConfig:
     retry_backoff_factor: float = 2.0
     retry_jitter_seconds: float = 0.5
 
-    pseudonym_salt: str = "dev-pseudonym-salt-change-in-prod"
+    pseudonym_salt: str = field(default="dev-pseudonym-salt-change-in-prod", repr=False)
     allowlist_path: Path = Path("./shared/allowlist.json")
     redaction_rules_path: Path = Path("./shared/redaction_rules.json")
     log_file_path: Path = Path("./logs/collector/collector.log")
@@ -81,6 +194,11 @@ class CollectorConfig:
     auth_failure_burst_threshold: int = 5
     auth_failure_window_seconds: int = 60
     extra: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        errors = _production_config_errors(self)
+        if errors:
+            raise CollectorConfigurationError("Invalid collector configuration: " + " ".join(errors))
 
     @classmethod
     def from_env(cls, config_path: Optional[str | Path] = None) -> "CollectorConfig":
@@ -109,6 +227,7 @@ class CollectorConfig:
             log_dir = repo_root / log_dir
 
         return cls(
+            app_env=_env_str("APP_ENV", "development").lower(),
             collector_id=_env_str("COLLECTOR_ID", "col_acme_blr_01"),
             tenant_id=_env_str("COLLECTOR_TENANT_ID", "tnt_acme_001"),
             collector_token=_env_str("COLLECTOR_TOKEN", "dev-collector-token"),
