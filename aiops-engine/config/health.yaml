@@ -1,0 +1,42 @@
+health:
+  heartbeat:
+    stale_after_seconds: 15
+    offline_after_seconds: 45
+
+  telemetry:
+    stale_after_seconds: 30
+
+  z_bands:
+    excellent_below: 2.0
+    good_below: 3.5
+    fair_up_to: 5.0
+
+  static_limits:
+    cpu_pct:
+      fair: 85
+      poor: 95
+    memory_pct:
+      fair: 85
+      poor: 95
+    disk_pct:
+      fair: 85
+      poor: 95
+    latency_ms:
+      fair: 200
+      poor: 500
+    packet_loss_pct:
+      fair: 2
+      poor: 5
+
+  baseline:
+    min_samples: 30
+
+  hysteresis:
+    improve_after_consecutive: 2
+
+  security:
+    window_seconds: 300
+
+  collector_resources:
+    cpu_pct_fair: 50
+    memory_mb_fair: 512
