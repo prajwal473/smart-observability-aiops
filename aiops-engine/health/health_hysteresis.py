@@ -48,6 +48,7 @@ class HealthHysteresis:
         self.current_states = {}
         self.pending_states = {}
         self.history = []
+        self.last_timestamps = {}
 
     def _validate_identity(self, tenant_id, entity_type, entity_id):
 
@@ -111,6 +112,18 @@ class HealthHysteresis:
             entity_type,
             entity_id,
         )
+
+        last_evaluated_at_utc = self.last_timestamps.get(key)
+
+        # Stale evaluation: ignore older timestamps to prevent regression.
+        if (
+            last_evaluated_at_utc is not None
+            and now_utc < last_evaluated_at_utc
+        ):
+            return self.current_states.get(key, proposed_state)
+
+        # Update last evaluated timestamp for valid (equal or newer) evaluations.
+        self.last_timestamps[key] = now_utc
 
         # First evaluation.
         if key not in self.current_states:

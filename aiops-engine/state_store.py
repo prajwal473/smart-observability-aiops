@@ -212,18 +212,47 @@ class InMemoryStateStore(StateStore):
 
         with self._lock:
 
-            source = self._get_or_create_source(
-                tenant_id,
-                source_id,
-            )
-
             collector = self._get_or_create_collector(
                 tenant_id,
                 collector_id,
             )
 
-            # Associate this source with its reporting collector.
-            source["collector_id"] = collector_id
+            # Heartbeats update collector state only.
+            # They must not create, retrieve, or modify a source record.
+            if event_type == "collector_heartbeat":
+
+                if (
+                    collector["last_seen_utc"] is None
+                    or received_at > self._validate_timestamp(
+                        collector["last_seen_utc"],
+                        "last_seen_utc",
+                    )
+                ):
+
+                    collector.update({
+                        "last_seen_utc": payload["received_at_utc"],
+                        "config_status": data.get(
+                            "config_status",
+                            collector["config_status"],
+                        ),
+                        "resource_cpu_pct": data.get(
+                            "resource_cpu_pct"
+                        ),
+                        "resource_memory_mb": data.get(
+                            "resource_memory_mb"
+                        ),
+                        "collector_version": data.get(
+                            "collector_version"
+                        ),
+                        "online": True,
+                    })
+
+                return True
+
+            source = self._get_or_create_source(
+                tenant_id,
+                source_id,
+            )
 
             # Infrastructure and network telemetry update source metrics.
             if event_type in {
@@ -243,7 +272,7 @@ class InMemoryStateStore(StateStore):
 
                 if is_newer:
                     source["metrics"].update(deepcopy(data))
-
+                    source["collector_id"] = collector_id
                     source["last_telemetry_at_utc"] = (
                         payload["event_time_utc"]
                     )
@@ -277,39 +306,10 @@ class InMemoryStateStore(StateStore):
                         "last_telemetry_at_utc",
                     )
                 ):
+                    source["collector_id"] = collector_id
                     source["last_telemetry_at_utc"] = (
                         payload["event_time_utc"]
                     )
-
-            # Heartbeats update collector state only.
-            # They must not make a source appear to have reported telemetry.
-            elif event_type == "collector_heartbeat":
-
-                if (
-                    collector["last_seen_utc"] is None
-                    or received_at > self._validate_timestamp(
-                        collector["last_seen_utc"],
-                        "last_seen_utc",
-                    )
-                ):
-
-                    collector.update({
-                        "last_seen_utc": payload["received_at_utc"],
-                        "config_status": data.get(
-                            "config_status",
-                            collector["config_status"],
-                        ),
-                        "resource_cpu_pct": data.get(
-                            "resource_cpu_pct"
-                        ),
-                        "resource_memory_mb": data.get(
-                            "resource_memory_mb"
-                        ),
-                        "collector_version": data.get(
-                            "collector_version"
-                        ),
-                        "online": True,
-                    })
 
         return True
 

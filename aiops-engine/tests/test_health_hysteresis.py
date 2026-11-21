@@ -372,6 +372,117 @@ class TestHealthHysteresis(unittest.TestCase):
                 reason=None
             )
 
+    def test_stale_evaluation_does_not_regress_history_timestamp(self):
+        t1 = self.now
+        t2 = self.now + timedelta(minutes=5)
+        t_stale = self.now - timedelta(minutes=10)
+
+        # Transition Good -> Fair at t2
+        self.evaluate("Good", timestamp=t1)
+        res = self.evaluate("Fair", timestamp=t2)
+        self.assertEqual(res, "Fair")
+
+        history_before = len(self.hysteresis.get_history("tenant_001"))
+
+        # Stale evaluation proposing Poor with older timestamp
+        stale_res = self.evaluate("Poor", timestamp=t_stale)
+        self.assertEqual(stale_res, "Fair")
+
+        history_after = self.hysteresis.get_history("tenant_001")
+        self.assertEqual(len(history_after), history_before)
+        self.assertEqual(history_after[-1].changed_at_utc, t2)
+        self.assertEqual(self.hysteresis.get_state("tenant_001", "source", "source_001"), "Fair")
+
+    def test_stale_evaluation_does_not_increment_improvement_counter(self):
+        t1 = self.now
+        t2 = self.now + timedelta(minutes=5)
+        t_stale = self.now + timedelta(minutes=2)
+
+        # Entity goes Poor at t2
+        self.evaluate("Good", timestamp=t1)
+        self.evaluate("Poor", timestamp=t2)
+
+        # Stale evaluation proposing Good at t_stale (t_stale < t2)
+        res = self.evaluate("Good", timestamp=t_stale)
+        self.assertEqual(res, "Poor")
+
+        # Pending counter must not be created or modified
+        pending = self.hysteresis.pending_states.get(("tenant_001", "source", "source_001"))
+        self.assertIsNone(pending)
+
+    def test_consecutive_stale_evaluations_cannot_trigger_improvement(self):
+        t_current = self.now + timedelta(minutes=10)
+        t_stale1 = self.now + timedelta(minutes=1)
+        t_stale2 = self.now + timedelta(minutes=2)
+
+        # State degraded to Poor at t_current
+        self.evaluate("Poor", timestamp=t_current)
+
+        # Two consecutive stale evaluations proposing Good
+        res1 = self.evaluate("Good", timestamp=t_stale1)
+        res2 = self.evaluate("Good", timestamp=t_stale2)
+
+        self.assertEqual(res1, "Poor")
+        self.assertEqual(res2, "Poor")
+        self.assertEqual(self.hysteresis.get_state("tenant_001", "source", "source_001"), "Poor")
+        self.assertEqual(len(self.hysteresis.get_history("tenant_001")), 1)
+
+    def test_equal_timestamp_evaluation_is_accepted(self):
+        t_same = self.now + timedelta(minutes=5)
+
+        # First evaluation sets initial state
+        self.evaluate("Poor", timestamp=t_same)
+
+        # First improvement attempt at exact same timestamp
+        res1 = self.evaluate("Good", timestamp=t_same)
+        self.assertEqual(res1, "Poor")
+        pending = self.hysteresis.pending_states.get(("tenant_001", "source", "source_001"))
+        self.assertIsNotNone(pending)
+        self.assertEqual(pending["count"], 1)
+
+        # Second improvement attempt completing the threshold at exact same timestamp
+        res2 = self.evaluate("Good", timestamp=t_same)
+        self.assertEqual(res2, "Good")
+        self.assertEqual(self.hysteresis.get_state("tenant_001", "source", "source_001"), "Good")
+
+        history = self.hysteresis.get_history("tenant_001")
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[-1].changed_at_utc, t_same)
+
+    def test_contract_adapter_timestamp_consistency_under_delayed_evaluations(self):
+        from contract_adapter import _build_health_record
+        from health.health_classifier import HealthResult
+
+        t1 = self.now
+        t2 = self.now + timedelta(minutes=5)
+        t_stale = self.now - timedelta(minutes=15)
+
+        self.evaluate("Good", timestamp=t1)
+        self.evaluate("Fair", timestamp=t2)
+
+        # Delayed evaluation proposing Poor
+        self.evaluate("Poor", timestamp=t_stale)
+
+        class MockHealthManager:
+            def __init__(m_self, hyst):
+                m_self.hysteresis = hyst
+            def get_history(m_self, tenant_id, entity_type, entity_id):
+                return m_self.hysteresis.get_history(tenant_id, entity_type, entity_id)
+
+        mgr = MockHealthManager(self.hysteresis)
+        hr = HealthResult(
+            state="Fair",
+            reason="Degraded",
+            reason_details=[],
+            stale=False,
+            signals=[],
+            evaluated_at_utc=t2,
+        )
+
+        record = _build_health_record(hr, mgr, "tenant_001", "source", "source_001")
+        self.assertEqual(record["state"], "Fair")
+        self.assertEqual(record["changed_at_utc"], t2.isoformat().replace("+00:00", "Z"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,3 +29,8 @@ logs/
 
 # Separate nested repository
 smart-observability-aiops/
+
+# AIOps Engine build artifacts
+/aiops-engine/build/
+/aiops-engine/dist/
+/aiops-engine/*.egg-info/

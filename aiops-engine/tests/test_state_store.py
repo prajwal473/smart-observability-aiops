@@ -412,6 +412,154 @@ class TestInMemoryStateStore(unittest.TestCase):
 
         self.assertEqual(len(original), 1)
 
+    def test_custom_state_store_injection_into_engine(self):
+        from engine import AIOpsEngine
+
+        class CustomMockStore(StateStore):
+            def __init__(self):
+                self.recorded = []
+
+            def record_telemetry(self, payload):
+                self.recorded.append(payload)
+
+            def get_source_snapshot(self, tenant_id, source_id):
+                return {"source_id": source_id, "metrics": {}}
+
+            def get_collector_snapshot(self, tenant_id, collector_id):
+                return {"collector_id": collector_id}
+
+            def add_anomalies(self, tenant_id, source_id, anomalies):
+                pass
+
+            def get_anomalies(self, tenant_id, source_id):
+                return []
+
+            def set_source_incidents(self, tenant_id, source_id, incidents):
+                pass
+
+            def add_recommendation(self, tenant_id, recommendation):
+                pass
+
+            def get_recommendations(self, tenant_id, incident_id):
+                return []
+
+        custom_store = CustomMockStore()
+        engine = AIOpsEngine(state_store=custom_store)
+        self.assertIs(engine.state_store, custom_store)
+
+        payload = self.make_payload()
+        engine.process_payload(payload)
+        self.assertEqual(len(custom_store.recorded), 1)
+        self.assertEqual(custom_store.recorded[0]["payload_id"], "payload_001")
+
+    def test_stale_telemetry_does_not_regress_source_collector_association(self):
+        # 1. Collector A reports newer telemetry
+        newer_payload = self.make_payload(
+            collector_id="collector_A",
+            source_id="source_shared",
+            event_time="2026-11-20T10:15:00Z",
+            data={"cpu_pct": 50.0},
+        )
+        self.store.record_telemetry(newer_payload)
+
+        # 2. Collector B reports older telemetry for the same source
+        stale_payload = self.make_payload(
+            collector_id="collector_B",
+            source_id="source_shared",
+            event_time="2026-11-20T10:05:00Z",
+            data={"cpu_pct": 99.0},
+        )
+        self.store.record_telemetry(stale_payload)
+
+        # 3. Verify Collector A remains associated and metrics remain unchanged
+        snapshot = self.store.get_source_snapshot("tenant_1", "source_shared")
+        self.assertEqual(snapshot["collector_id"], "collector_A")
+        self.assertEqual(snapshot["metrics"]["cpu_pct"], 50.0)
+        self.assertEqual(snapshot["last_telemetry_at_utc"], "2026-11-20T10:15:00Z")
+
+    def test_newer_telemetry_updates_source_collector_association(self):
+        # 1. Collector A reports older telemetry
+        older_payload = self.make_payload(
+            collector_id="collector_A",
+            source_id="source_shared",
+            event_time="2026-11-20T10:05:00Z",
+            data={"cpu_pct": 40.0},
+        )
+        self.store.record_telemetry(older_payload)
+
+        # 2. Collector B reports newer telemetry
+        newer_payload = self.make_payload(
+            collector_id="collector_B",
+            source_id="source_shared",
+            event_time="2026-11-20T10:15:00Z",
+            data={"cpu_pct": 75.0},
+        )
+        self.store.record_telemetry(newer_payload)
+
+        # 3. Verify Collector B becomes associated and its metrics are stored
+        snapshot = self.store.get_source_snapshot("tenant_1", "source_shared")
+        self.assertEqual(snapshot["collector_id"], "collector_B")
+        self.assertEqual(snapshot["metrics"]["cpu_pct"], 75.0)
+        self.assertEqual(snapshot["last_telemetry_at_utc"], "2026-11-20T10:15:00Z")
+
+    def test_collector_heartbeat_does_not_alter_source_collector_association(self):
+        # 1. Collector A reports telemetry for a source
+        telemetry_payload = self.make_payload(
+            collector_id="collector_A",
+            source_id="source_shared",
+            event_time="2026-11-20T10:10:00Z",
+            data={"cpu_pct": 55.0},
+        )
+        self.store.record_telemetry(telemetry_payload)
+
+        # 2. Collector B sends a heartbeat using that source's ID
+        heartbeat_payload = self.make_payload(
+            collector_id="collector_B",
+            source_id="source_shared",
+            event_type="collector_heartbeat",
+            event_time="2026-11-20T10:20:00Z",
+            received_at="2026-11-20T10:20:01Z",
+            data={
+                "collector_version": "1.0.0",
+                "config_status": "valid",
+                "resource_cpu_pct": 2.0,
+                "resource_memory_mb": 64,
+            },
+        )
+        self.store.record_telemetry(heartbeat_payload)
+
+        # 3. Verify the source association and telemetry timestamp remain unchanged
+        snapshot = self.store.get_source_snapshot("tenant_1", "source_shared")
+        self.assertEqual(snapshot["collector_id"], "collector_A")
+        self.assertEqual(snapshot["last_telemetry_at_utc"], "2026-11-20T10:10:00Z")
+
+    def test_collector_heartbeat_does_not_create_source_record(self):
+        # 1. Send a heartbeat with a source ID that does not exist
+        heartbeat_payload = self.make_payload(
+            collector_id="collector_fresh",
+            source_id="nonexistent_source",
+            event_type="collector_heartbeat",
+            event_time="2026-11-20T10:30:00Z",
+            received_at="2026-11-20T10:30:02Z",
+            data={
+                "collector_version": "2.0.0",
+                "config_status": "valid",
+                "resource_cpu_pct": 3.0,
+                "resource_memory_mb": 128,
+            },
+        )
+        self.store.record_telemetry(heartbeat_payload)
+
+        # 2. Verify no source record was created in the store
+        key = ("tenant_1", "nonexistent_source")
+        self.assertNotIn(key, self.store._sources)
+
+        # 3. Verify collector heartbeat state is still updated correctly
+        collector = self.store.get_collector_snapshot("tenant_1", "collector_fresh")
+        self.assertTrue(collector["online"])
+        self.assertEqual(collector["last_seen_utc"], "2026-11-20T10:30:02Z")
+        self.assertEqual(collector["collector_version"], "2.0.0")
+
 
 if __name__ == "__main__":
     unittest.main()

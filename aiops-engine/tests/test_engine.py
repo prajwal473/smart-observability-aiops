@@ -388,6 +388,40 @@ class TestAIOpsEngine(unittest.TestCase):
             ["Excellent", "Good", "Fair", "Poor"],
         )
 
+    def test_canonical_security_event_processing(self):
+        security_payload = self.make_payload(
+            payload_id="payload_security_001",
+            event_type="security_events",
+            data={
+                "event_category": "auth_failure_burst",
+                "severity": "high",
+                "count": 12,
+                "window_seconds": 60,
+                "context": "repeated failed logins within window",
+            },
+        )
+
+        result = self.engine.process_payload(
+            security_payload,
+            now_utc=self.now,
+        )
+
+        self.assertIsInstance(result, AIOpsResult)
+        # Verify envelope was recorded in state_store
+        snapshot = self.engine.state_store.get_source_snapshot(
+            "tenant_001",
+            "src_001",
+        )
+        self.assertEqual(len(snapshot["security_events"]), 1)
+        self.assertEqual(
+            snapshot["security_events"][0]["data"]["event_category"],
+            "auth_failure_burst",
+        )
+        self.assertEqual(
+            snapshot["security_events"][0]["data"]["count"],
+            12,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

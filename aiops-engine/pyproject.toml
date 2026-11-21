@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-observability-aiops-engine"
+version = "1.0.0"
+description = "AIOps engine for anomaly detection, incident correlation, recommendations, and health classification."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools]
+py-modules = [
+    "engine",
+    "state_store",
+    "serialization",
+    "contract_adapter",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "anomaly_detection*",
+    "baseline*",
+    "correlation*",
+    "health*",
+    "incidents*",
+    "recommendations*",
+    "src*",
+    "config*",
+]
+exclude = [
+    "tests*",
+]
+
+[tool.setuptools.package-data]
+config = [
+    "health.yaml",
+    "settings.json",
+]

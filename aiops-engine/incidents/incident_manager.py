@@ -204,63 +204,102 @@ class IncidentManager:
             )
 
         previous_status = stored["status"]
+        stored_timestamp = self._validate_timestamp(stored["updated_at_utc"])
+        incoming_timestamp = self._validate_timestamp(incident["updated_at_utc"])
 
-        incoming_timestamp = self._validate_timestamp(
-            incident["updated_at_utc"]
-        )
+        is_stale = incoming_timestamp < stored_timestamp
+        is_newer = incoming_timestamp > stored_timestamp
 
-        stored_timestamp = self._validate_timestamp(
-            stored["updated_at_utc"]
-        )
+        changes = {}
 
-        latest_timestamp = max(
-            incoming_timestamp,
-            stored_timestamp
-        )
+        # Timestamp handling:
+        # If the update is newer, store its normalized UTC representation ending in Z.
+        # If stale or equal, stored timestamp must not regress.
+        if is_newer:
+            normalized_incoming_utc = (
+                incoming_timestamp.isoformat().replace("+00:00", "Z")
+            )
+            if stored["updated_at_utc"] != normalized_incoming_utc:
+                changes["updated_at_utc"] = {
+                    "previous": stored["updated_at_utc"],
+                    "new": normalized_incoming_utc,
+                }
+                stored["updated_at_utc"] = normalized_incoming_utc
 
-        stored["updated_at_utc"] = (
-            latest_timestamp.isoformat().replace("+00:00", "Z")
-        )
+        # Metadata changes:
+        # Stale updates MUST NOT overwrite newer metadata.
+        if not is_stale:
+            if stored["title"] != incident["title"]:
+                changes["title"] = {
+                    "previous": stored["title"],
+                    "new": incident["title"],
+                }
+                stored["title"] = incident["title"]
 
-        stored["title"] = incident["title"]
-
+        # Severity escalation check:
         existing_severity = stored["severity"].lower()
         incoming_severity = incident["severity"].lower()
+        existing_rank = self.SEVERITY_RANK.get(existing_severity, 0)
+        incoming_rank = self.SEVERITY_RANK.get(incoming_severity, 0)
 
-        existing_rank = self.SEVERITY_RANK.get(
-            existing_severity,
-            0
-        )
+        # Do not allow stale updates to downgrade severity; allow escalation only if not stale
+        # or if higher rank
+        if not is_stale and incoming_rank >= existing_rank:
+            if stored["severity"] != incident["severity"]:
+                changes["severity"] = {
+                    "previous": stored["severity"],
+                    "new": incident["severity"],
+                }
+                stored["severity"] = incident["severity"]
 
-        incoming_rank = self.SEVERITY_RANK.get(
-            incoming_severity,
-            0
-        )
+        # Merge affected sources
+        current_sources = set(stored["affected_source_ids"])
+        new_sources = [
+            s for s in incident["affected_source_ids"]
+            if s not in current_sources
+        ]
+        if new_sources:
+            changes["affected_source_ids"] = {
+                "added": new_sources,
+            }
+            stored["affected_source_ids"] = list(dict.fromkeys(
+                stored["affected_source_ids"] + new_sources
+            ))
 
-        if incoming_rank >= existing_rank:
-            stored["severity"] = incident["severity"]
+        # Merge contributing anomalies
+        current_anomalies = set(stored["contributing_anomaly_ids"])
+        new_anomalies = [
+            a for a in incident["contributing_anomaly_ids"]
+            if a not in current_anomalies
+        ]
+        if new_anomalies:
+            changes["contributing_anomaly_ids"] = {
+                "added": new_anomalies,
+            }
+            stored["contributing_anomaly_ids"] = list(dict.fromkeys(
+                stored["contributing_anomaly_ids"] + new_anomalies
+            ))
 
-        stored["affected_source_ids"] = list(dict.fromkeys(
-            stored["affected_source_ids"]
-            + incident["affected_source_ids"]
-        ))
+        # Recommendation ID
+        if not is_stale and incident["recommendation_id"] is not None:
+            if stored["recommendation_id"] != incident["recommendation_id"]:
+                changes["recommendation_id"] = {
+                    "previous": stored["recommendation_id"],
+                    "new": incident["recommendation_id"],
+                }
+                stored["recommendation_id"] = incident["recommendation_id"]
 
-        stored["contributing_anomaly_ids"] = list(dict.fromkeys(
-            stored["contributing_anomaly_ids"]
-            + incident["contributing_anomaly_ids"]
-        ))
-
-        if incident["recommendation_id"] is not None:
-            stored["recommendation_id"] = incident["recommendation_id"]
-
-        self._record_history(
-            incident_id=incident_id,
-            event="updated",
-            previous_status=previous_status,
-            new_status=previous_status,
-            actor_id="system",
-            timestamp_utc=stored["updated_at_utc"]
-        )
+        # Avoid creating history events for updates that make no actual changes
+        if changes:
+            self._record_history(
+                incident_id=incident_id,
+                event="updated",
+                previous_status=previous_status,
+                new_status=previous_status,
+                actor_id="system",
+                timestamp_utc=stored["updated_at_utc"],
+                changes=changes,
+            )
 
         return deepcopy(stored)
 
@@ -271,16 +310,21 @@ class IncidentManager:
         previous_status,
         new_status,
         actor_id,
-        timestamp_utc
+        timestamp_utc,
+        changes=None,
     ):
 
-        self.history[incident_id].append({
+        entry = {
             "event": event,
             "previous_status": previous_status,
             "new_status": new_status,
             "actor_id": actor_id,
-            "timestamp_utc": timestamp_utc
-        })
+            "timestamp_utc": timestamp_utc,
+        }
+        if changes is not None:
+            entry["changes"] = deepcopy(changes)
+
+        self.history[incident_id].append(entry)
 
     def _get_stored_incident(self, incident_id):
 
