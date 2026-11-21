@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from copy import deepcopy
 
 
 class AutoResolver:
@@ -24,6 +25,12 @@ class AutoResolver:
 
         # Tracks when continuous recovery started.
         self.recovery_states = {}
+
+    def checkpoint(self):
+        return deepcopy(self.recovery_states)
+
+    def restore(self, snapshot):
+        self.recovery_states = deepcopy(snapshot)
 
     @staticmethod
     def _validate_timestamp(timestamp):

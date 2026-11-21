@@ -1,5 +1,6 @@
 from baseline.baseline_registry import BaselineRegistry
 from anomaly_detection.anomaly_detector import AnomalyDetector
+from transaction_support import checkpoint_component, restore_component
 
 
 class MetricProcessor:
@@ -20,6 +21,14 @@ class MetricProcessor:
             if anomaly_detector is not None
             else AnomalyDetector()
         )
+
+    def checkpoint(self):
+        return checkpoint_component(
+            self.anomaly_detector, "metric_processor.anomaly_detector"
+        )
+
+    def restore(self, snapshot):
+        restore_component(snapshot)
 
     def process(
         self,

@@ -1,4 +1,5 @@
 import math
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 
@@ -42,6 +43,12 @@ class DuplicateDetector:
 
         # Stores previously processed anomaly IDs and timestamps.
         self.seen_anomalies = {}
+
+    def checkpoint(self):
+        return deepcopy(self.seen_anomalies)
+
+    def restore(self, snapshot):
+        self.seen_anomalies = deepcopy(snapshot)
 
     @staticmethod
     def _validate_timestamp(timestamp):

@@ -14,6 +14,24 @@ class BaselineRegistry:
         self.min_samples = min_samples
         self.baselines = {}
 
+    def checkpoint(self):
+        return {
+            key: baseline.checkpoint()
+            for key, baseline in self.baselines.items()
+        }
+
+    def restore(self, snapshot):
+        restored = {}
+        for key, state in snapshot.items():
+            baseline = BaselineEngine(
+                alpha=state["alpha"],
+                window_size=state["window_size"],
+                min_samples=state["min_samples"],
+            )
+            baseline.restore(state)
+            restored[key] = baseline
+        self.baselines = restored
+
     def update(
         self,
         tenant_id,

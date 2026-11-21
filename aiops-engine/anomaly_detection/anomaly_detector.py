@@ -16,6 +16,12 @@ class AnomalyDetector:
 
         self.threshold = float(threshold)
 
+    def checkpoint(self):
+        return self.threshold
+
+    def restore(self, snapshot):
+        self.threshold = snapshot
+
     def detect(self, value, baseline):
 
         # Validate incoming metric

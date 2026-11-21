@@ -8,6 +8,7 @@ from health.health_classifier import (
 )
 from health.health_config import load_health_config
 from health.health_hysteresis import HealthHysteresis
+from transaction_support import checkpoint_component, restore_component
 
 
 class HealthManager:
@@ -60,6 +61,12 @@ class HealthManager:
                 improve_after_consecutive=improve_after
             )
         )
+
+    def checkpoint(self):
+        return checkpoint_component(self.hysteresis, "health hysteresis")
+
+    def restore(self, snapshot):
+        restore_component(snapshot)
 
     def _apply_hysteresis(
         self,

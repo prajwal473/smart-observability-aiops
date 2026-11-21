@@ -76,6 +76,26 @@ class BaselineEngine:
 
         return True
 
+    def checkpoint(self):
+        return {
+            "alpha": self.alpha,
+            "window_size": self.window_size,
+            "min_samples": self.min_samples,
+            "samples": list(self.samples),
+            "ewma": self.ewma,
+        }
+
+    def restore(self, snapshot):
+        if not isinstance(snapshot, dict):
+            raise ValueError("Invalid baseline checkpoint")
+        self.alpha = snapshot["alpha"]
+        self.window_size = snapshot["window_size"]
+        self.min_samples = snapshot["min_samples"]
+        self.samples = deque(
+            snapshot["samples"], maxlen=self.window_size
+        )
+        self.ewma = snapshot["ewma"]
+
     def get_baseline(self):
 
         if not self.samples:

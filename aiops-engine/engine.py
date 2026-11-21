@@ -1,5 +1,6 @@
 import math
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -10,6 +11,11 @@ from incidents.incident_pipeline import IncidentPipeline
 from recommendations.recommendation_engine import RecommendationEngine
 from health.health_manager import HealthManager
 from state_store import InMemoryStateStore
+from transaction_support import (
+    ENGINE_TRANSACTION_LOCK,
+    checkpoint_component,
+    restore_component,
+)
 
 
 @dataclass
@@ -39,6 +45,10 @@ class AIOpsEngine:
 
     This implementation uses in-memory components.
     Production persistence should be supplied through StateStore.
+
+    Engine transactions are serialized across instances, including when
+    collaborators are shared. Direct mutation of injected collaborators
+    outside engine methods must be externally serialized by the caller.
     """
 
     NUMERIC_METRICS = {
@@ -115,6 +125,62 @@ class AIOpsEngine:
 
         # Protect in-memory components from concurrent mutations.
         self._lock = threading.RLock()
+
+    @contextmanager
+    def _batch_transaction(self):
+        """Checkpoint every stateful engine collaborator around a store transaction."""
+        with ENGINE_TRANSACTION_LOCK:
+            original_seen_payload_ids = self._seen_payload_ids
+            components = (
+                (self.baseline_registry, "baseline_registry"),
+                (
+                    getattr(self.metric_processor, "baseline_registry", None),
+                    "metric_processor.baseline_registry",
+                ),
+                (self.metric_processor, "metric_processor"),
+                (self.incident_pipeline, "incident_pipeline"),
+                (self.recommendation_engine, "recommendation_engine"),
+                (self.health_manager, "health_manager"),
+            )
+            checkpoints = []
+            anomaly_counter = self._anomaly_counter
+            seen = set()
+            for component, name in components:
+                if component is None or id(component) in seen:
+                    continue
+                seen.add(id(component))
+                checkpoints.append(checkpoint_component(component, name))
+
+            transaction = getattr(self.state_store, "transaction", None)
+            if not callable(transaction):
+                raise TypeError(
+                    "state_store must implement transaction() for atomic batch processing"
+                )
+
+            try:
+                with transaction():
+                    yield
+            except BaseException as original_error:
+                self._seen_payload_ids = original_seen_payload_ids
+                self._anomaly_counter = anomaly_counter
+                restore_errors = []
+                for checkpoint in reversed(checkpoints):
+                    try:
+                        restore_component(checkpoint)
+                    except BaseException as exc:
+                        restore_errors.append(exc)
+                if restore_errors:
+                    raise RuntimeError(
+                        "Batch failed and one or more component rollbacks failed"
+                    ) from original_error
+                raise
+
+    @contextmanager
+    def _operation_lock(self):
+        """Acquire locks in shared-transaction, engine-instance order."""
+        with ENGINE_TRANSACTION_LOCK:
+            with self._lock:
+                yield
 
     # ---------------------------------------------------------
     # Validation helpers
@@ -559,8 +625,7 @@ class AIOpsEngine:
                 "now_utc must be a timezone-aware UTC datetime"
             )
 
-        with self._lock:
-
+        with self._operation_lock():
             snapshot = self.state_store.get_collector_snapshot(
                 tenant_id,
                 collector_id,
@@ -774,7 +839,7 @@ class AIOpsEngine:
                 "now_utc must be a timezone-aware UTC datetime"
             )
 
-        with self._lock:
+        with self._operation_lock():
 
             validated = [
                 self._validate_payload(payload)
@@ -828,131 +893,87 @@ class AIOpsEngine:
             collector_ids = set()
             source_ids = set()
             all_anomalies = []
+            pending_payload_keys = set()
 
-            for payload in validated:
+            with self._batch_transaction():
+                for payload in validated:
+                    payload_key = (tenant_id, payload["payload_id"])
+                    if (
+                        payload_key in self._seen_payload_ids
+                        or payload_key in pending_payload_keys
+                    ):
+                        continue
+                    pending_payload_keys.add(payload_key)
 
-                payload_key = (
-                    tenant_id,
-                    payload["payload_id"],
-                )
+                    collector_id = payload["collector_id"]
+                    source_id = payload["source_id"]
+                    collector_ids.add(collector_id)
+                    source_ids.add(source_id)
 
-                if payload_key in self._seen_payload_ids:
-                    continue
-
-                self._seen_payload_ids.add(payload_key)
-
-                collector_id = payload["collector_id"]
-                source_id = payload["source_id"]
-
-                collector_ids.add(collector_id)
-                source_ids.add(source_id)
-
-                # Snapshot before recording the new event.
-                previous_snapshot = (
-                    self.state_store.get_source_snapshot(
-                        tenant_id,
-                        source_id,
+                    previous_snapshot = self.state_store.get_source_snapshot(
+                        tenant_id, source_id
                     )
-                )
-
-                previous_timestamp = (
-                    previous_snapshot.get(
+                    previous_timestamp = previous_snapshot.get(
                         "last_telemetry_at_utc"
                     )
-                )
-
-                event_time = self._parse_utc(
-                    payload["event_time_utc"],
-                    "event_time_utc",
-                )
-
-                # Persist the approved telemetry envelope.
-                self.state_store.record_telemetry(payload)
-
-                # Prevent older events from changing the baseline.
-                is_out_of_order = False
-
-                if previous_timestamp is not None:
-                    previous_time = self._parse_utc(
-                        previous_timestamp,
-                        "last_telemetry_at_utc",
+                    event_time = self._parse_utc(
+                        payload["event_time_utc"], "event_time_utc"
                     )
+                    self.state_store.record_telemetry(payload)
 
-                    if event_time < previous_time:
-                        is_out_of_order = True
+                    is_out_of_order = False
+                    if previous_timestamp is not None:
+                        previous_time = self._parse_utc(
+                            previous_timestamp, "last_telemetry_at_utc"
+                        )
+                        is_out_of_order = event_time < previous_time
 
-                if not is_out_of_order:
-                    anomalies = self._process_numeric_metrics(
-                        payload,
-                        now_utc,
-                    )
+                    if not is_out_of_order:
+                        all_anomalies.extend(
+                            self._process_numeric_metrics(payload, now_utc)
+                        )
 
-                    all_anomalies.extend(anomalies)
-
-            # Send all detected anomalies through the existing
-            # atomic incident pipeline.
-            if all_anomalies:
-
-                pipeline_result = (
-                    self.incident_pipeline.process_batch(
+                if all_anomalies:
+                    pipeline_result = self.incident_pipeline.process_batch(
                         all_anomalies,
-                        # IncidentPipeline's AutoResolver and
-                        # IncidentPriority expect ISO-8601 UTC
-                        # strings ending in Z, not datetime objects.
                         now_utc=self._format_utc(now_utc),
                     )
+                    accepted_ids = set(
+                        pipeline_result["accepted_anomaly_ids"]
+                    )
+                    accepted_anomalies = [
+                        anomaly for anomaly in all_anomalies
+                        if anomaly["anomaly_id"] in accepted_ids
+                    ]
+                    incidents = pipeline_result["incidents"]
+                else:
+                    accepted_anomalies = []
+                    incidents = []
+
+                self._store_anomalies(accepted_anomalies)
+                self._store_incidents(incidents)
+                recommendations = self._generate_recommendations(
+                    incidents, self._format_utc(now_utc)
                 )
-
-                accepted_ids = set(
-                    pipeline_result["accepted_anomaly_ids"]
+                health = self._classify_batch_health(
+                    tenant_id, collector_ids, now_utc
                 )
-
-                accepted_anomalies = [
-                    anomaly
-                    for anomaly in all_anomalies
-                    if anomaly["anomaly_id"] in accepted_ids
-                ]
-
-                incidents = pipeline_result["incidents"]
-
-            else:
-                accepted_anomalies = []
-                incidents = []
-
-            # Store only anomalies accepted by duplicate detection.
-            self._store_anomalies(
-                accepted_anomalies
-            )
-
-            self._store_incidents(
-                incidents
-            )
-
-            recommendations = (
-                self._generate_recommendations(
-                    incidents,
-                    self._format_utc(now_utc),
+                source_health = self._classify_batch_source_health(
+                    tenant_id, source_ids, now_utc
                 )
-            )
+                result = AIOpsResult(
+                    anomalies=accepted_anomalies,
+                    incidents=incidents,
+                    recommendations=recommendations,
+                    health=health,
+                    source_health=source_health,
+                )
+                # Prepare before publication so allocation errors still roll
+                # back the StateStore. Reference assignment is atomic.
+                replacement_seen_payload_ids = (
+                    self._seen_payload_ids | pending_payload_keys
+                )
+                self._seen_payload_ids = replacement_seen_payload_ids
 
-            # Preserve collector and fleet health.
-            health = self._classify_batch_health(
-                tenant_id,
-                collector_ids,
-                now_utc,
-            )
-
-            # Classify health independently for every source.
-            source_health = self._classify_batch_source_health(
-                tenant_id,
-                source_ids,
-                now_utc,
-            )
-
-            return AIOpsResult(
-                anomalies=accepted_anomalies,
-                incidents=incidents,
-                recommendations=recommendations,
-                health=health,
-                source_health=source_health,
-            )
+            # No ordinary fallible work remains after transaction commit.
+            return result

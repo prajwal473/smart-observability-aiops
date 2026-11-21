@@ -125,16 +125,52 @@ class IncidentPipeline:
             )
         }
 
+    def checkpoint(self):
+        """Checkpoint pipeline-owned state and all stateful collaborators."""
+        collaborators = (
+            self.duplicate_detector,
+            self.incident_correlator,
+            self.incident_manager,
+            self.incident_priority,
+            self.auto_resolver,
+        )
+        states = []
+        seen = set()
+        for component in collaborators:
+            if id(component) in seen:
+                continue
+            seen.add(id(component))
+            checkpoint = getattr(component, "checkpoint", None)
+            restore = getattr(component, "restore", None)
+            declared = type(component).__dict__
+            if (
+                not callable(checkpoint)
+                or not callable(restore)
+                or not callable(declared.get("checkpoint"))
+                or not callable(declared.get("restore"))
+            ):
+                raise NotImplementedError(
+                    f"{type(component).__name__} must implement checkpoint/restore"
+                )
+            states.append((component, checkpoint()))
+        return (deepcopy(self.anomalies_by_incident), states)
+
+    def restore(self, snapshot):
+        anomalies_by_incident, states = snapshot
+        self.anomalies_by_incident = deepcopy(anomalies_by_incident)
+        for component, state in reversed(states):
+            component.restore(state)
+
     def _restore_state(self, snapshot):
         """
         Restore all captured mutable state.
         """
 
-        self.duplicate_detector.seen_anomalies = (
+        self.duplicate_detector.seen_anomalies = deepcopy(
             snapshot["duplicate_detector"]
         )
 
-        self.incident_correlator.open_incidents = (
+        self.incident_correlator.open_incidents = deepcopy(
             snapshot["correlator_open_incidents"]
         )
 
@@ -142,12 +178,12 @@ class IncidentPipeline:
             snapshot["correlator_counter"]
         )
 
-        self.incident_correlator.correlation_details = (
+        self.incident_correlator.correlation_details = deepcopy(
             snapshot["correlation_details"]
         )
 
         # Restore historical anomaly evidence.
-        self.incident_correlator.anomaly_history = (
+        self.incident_correlator.anomaly_history = deepcopy(
             snapshot["correlator_anomaly_history"]
         )
 
@@ -155,14 +191,14 @@ class IncidentPipeline:
 
             manager = state["manager"]
 
-            manager.incidents = state["incidents"]
-            manager.history = state["history"]
+            manager.incidents = deepcopy(state["incidents"])
+            manager.history = deepcopy(state["history"])
 
-        self.auto_resolver.recovery_states = (
+        self.auto_resolver.recovery_states = deepcopy(
             snapshot["recovery_states"]
         )
 
-        self.anomalies_by_incident = (
+        self.anomalies_by_incident = deepcopy(
             snapshot["anomalies_by_incident"]
         )
 

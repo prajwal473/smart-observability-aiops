@@ -2,6 +2,7 @@ import math
 from datetime import datetime, timezone
 
 from incidents.priority_scorer import PriorityScorer
+from transaction_support import checkpoint_component, restore_component
 
 
 class IncidentPriority:
@@ -55,6 +56,12 @@ class IncidentPriority:
 
         self.default_criticality = default_criticality
         self.duration_cap_minutes = duration_cap_minutes
+
+    def checkpoint(self):
+        return checkpoint_component(self.scorer, "incident priority scorer")
+
+    def restore(self, snapshot):
+        restore_component(snapshot)
 
     @staticmethod
     def _validate_score(value, field_name):

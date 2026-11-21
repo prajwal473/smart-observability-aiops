@@ -55,6 +55,12 @@ class RecommendationEngine:
     def __init__(self):
         self.recommendation_counter = 0
 
+    def checkpoint(self):
+        return self.recommendation_counter
+
+    def restore(self, snapshot):
+        self.recommendation_counter = snapshot
+
     @staticmethod
     def _validate_timestamp(timestamp: str) -> datetime:
         if not isinstance(timestamp, str) or not timestamp.endswith("Z"):

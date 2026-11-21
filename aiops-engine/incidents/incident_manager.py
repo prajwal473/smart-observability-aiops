@@ -34,6 +34,12 @@ class IncidentManager:
         self.incidents = {}
         self.history = {}
 
+    def checkpoint(self):
+        return deepcopy((self.incidents, self.history))
+
+    def restore(self, snapshot):
+        self.incidents, self.history = deepcopy(snapshot)
+
     @staticmethod
     def _validate_timestamp(timestamp):
 

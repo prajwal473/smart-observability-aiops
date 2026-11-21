@@ -29,6 +29,13 @@ class PriorityScorer:
     def __init__(self):
         pass
 
+    def checkpoint(self):
+        return None
+
+    def restore(self, snapshot):
+        if snapshot is not None:
+            raise ValueError("Invalid stateless scorer checkpoint")
+
     @staticmethod
     def _validate_score(name, value):
 

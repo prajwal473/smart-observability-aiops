@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from threading import RLock
@@ -13,6 +14,11 @@ class StateStore(ABC):
 
     All operations must remain tenant-scoped.
     """
+
+    @abstractmethod
+    def transaction(self):
+        """Return a context manager that rolls back on any exception."""
+        raise NotImplementedError
 
     @abstractmethod
     def record_telemetry(self, payload):
@@ -81,6 +87,29 @@ class InMemoryStateStore(StateStore):
         self._anomalies = {}
         self._source_incidents = {}
         self._recommendations = {}
+
+    @contextmanager
+    def transaction(self):
+        """Atomically protect all mutable in-memory store state."""
+        with self._lock:
+            snapshot = deepcopy((
+                self._sources,
+                self._collectors,
+                self._anomalies,
+                self._source_incidents,
+                self._recommendations,
+            ))
+            try:
+                yield self
+            except BaseException:
+                (
+                    self._sources,
+                    self._collectors,
+                    self._anomalies,
+                    self._source_incidents,
+                    self._recommendations,
+                ) = snapshot
+                raise
 
     # ---------------------------------------------------------
     # Validation helpers

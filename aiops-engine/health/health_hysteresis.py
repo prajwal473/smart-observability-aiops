@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from copy import deepcopy
 from datetime import datetime, timezone
 
 
@@ -49,6 +50,22 @@ class HealthHysteresis:
         self.pending_states = {}
         self.history = []
         self.last_timestamps = {}
+
+    def checkpoint(self):
+        return deepcopy((
+            self.current_states,
+            self.pending_states,
+            self.history,
+            self.last_timestamps,
+        ))
+
+    def restore(self, snapshot):
+        (
+            self.current_states,
+            self.pending_states,
+            self.history,
+            self.last_timestamps,
+        ) = deepcopy(snapshot)
 
     def _validate_identity(self, tenant_id, entity_type, entity_id):
 

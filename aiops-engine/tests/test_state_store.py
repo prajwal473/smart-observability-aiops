@@ -1,4 +1,7 @@
 import unittest
+from contextlib import contextmanager
+from copy import deepcopy
+from unittest.mock import patch
 
 from state_store import InMemoryStateStore, StateStore
 
@@ -7,6 +10,32 @@ class TestInMemoryStateStore(unittest.TestCase):
 
     def setUp(self):
         self.store = InMemoryStateStore()
+
+    def test_transaction_rollback_restores_checkpoint_without_second_copy(self):
+        payload = self.make_payload()
+        original_deepcopy = deepcopy
+        deepcopy_calls = []
+
+        def reject_rollback_deepcopy(value):
+            deepcopy_calls.append(value)
+            if len(deepcopy_calls) > 2:
+                raise AssertionError(
+                    "rollback attempted an unnecessary second checkpoint copy"
+                )
+            return original_deepcopy(value)
+
+        with patch("state_store.deepcopy", side_effect=reject_rollback_deepcopy):
+            with self.assertRaisesRegex(RuntimeError, "abort transaction"):
+                with self.store.transaction():
+                    self.store.record_telemetry(payload)
+                    raise RuntimeError("abort transaction")
+
+        self.assertEqual(len(deepcopy_calls), 2)
+        self.assertEqual(self.store._sources, {})
+        self.assertEqual(self.store._collectors, {})
+        self.assertEqual(self.store._anomalies, {})
+        self.assertEqual(self.store._source_incidents, {})
+        self.assertEqual(self.store._recommendations, {})
 
     def make_payload(
         self,
@@ -418,6 +447,15 @@ class TestInMemoryStateStore(unittest.TestCase):
         class CustomMockStore(StateStore):
             def __init__(self):
                 self.recorded = []
+
+            @contextmanager
+            def transaction(self):
+                snapshot = deepcopy(self.recorded)
+                try:
+                    yield self
+                except BaseException:
+                    self.recorded = deepcopy(snapshot)
+                    raise
 
             def record_telemetry(self, payload):
                 self.recorded.append(payload)

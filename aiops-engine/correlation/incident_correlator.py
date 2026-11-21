@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from copy import deepcopy
 import math
 
 
@@ -57,6 +58,22 @@ class IncidentCorrelator:
         # Key: (tenant_id, source_id)
         # Value: list of complete anomaly dictionaries.
         self.anomaly_history = {}
+
+    def checkpoint(self):
+        return deepcopy((
+            self.open_incidents,
+            self.incident_counter,
+            self.correlation_details,
+            self.anomaly_history,
+        ))
+
+    def restore(self, snapshot):
+        (
+            self.open_incidents,
+            self.incident_counter,
+            self.correlation_details,
+            self.anomaly_history,
+        ) = deepcopy(snapshot)
 
     @staticmethod
     def _parse_timestamp(timestamp):
